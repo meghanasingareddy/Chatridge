@@ -1,6 +1,8 @@
-# Flutter
+# BlueBridge - Offline Communication System
 
-A modern Flutter-based mobile application utilizing the latest mobile development technologies and tools for building responsive cross-platform applications.
+**Tagline**: *Bridging Communication Beyond Internet*
+
+BlueBridge is a revolutionary hybrid hardware-software solution that enables resilient, offline text-based communication. The system leverages an ESP32 microcontroller as a Bluetooth hub to relay messages between multiple Android devices, creating a localized, ad-hoc chat network that operates independently of internet or cellular infrastructure.
 
 ## 📋 Prerequisites
 

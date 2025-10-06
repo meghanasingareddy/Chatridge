@@ -34,7 +34,7 @@ class DeviceCardWidget extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
-              color: AppTheme.shadowLight.withOpacity(0.5),
+              color: AppTheme.shadowLight.withValues(alpha: 0.5),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),

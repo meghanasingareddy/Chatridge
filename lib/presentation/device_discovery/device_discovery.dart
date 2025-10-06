@@ -7,7 +7,7 @@ import 'package:sizer/sizer.dart';
 
 import '../../core/app_export.dart';
 import '../../services/bluetooth_service.dart';
-import './widgets/connection_dialog_widget.dart' hide DeviceCardWidget;
+import './widgets/connection_dialog_widget.dart';
 import './widgets/device_card_widget.dart';
 import './widgets/empty_state_widget.dart';
 import './widgets/manual_pairing_dialog_widget.dart';
@@ -23,7 +23,7 @@ class DeviceDiscovery extends StatefulWidget {
 class _DeviceDiscoveryState extends State<DeviceDiscovery>
     with TickerProviderStateMixin {
   late TabController _tabController;
-  final BluetoothService _bluetoothService = BluetoothService();
+  final BlueBridgeBluetoothService _bluetoothService = BlueBridgeBluetoothService();
   StreamSubscription<List<ScanResult>>? _scanResultsSubscription;
   StreamSubscription<bool>? _isScanningSubscription;
   bool _isScanning = false;
@@ -145,7 +145,7 @@ class _DeviceDiscoveryState extends State<DeviceDiscovery>
           label: 'Open Chat',
           textColor: Colors.white,
           onPressed: () {
-            Navigator.pushNamed(context, '/chat-interface');
+            Navigator.pushNamed(context, '/bluebridge-chat');
           },
         ),
       ),
@@ -582,7 +582,7 @@ class _DeviceDiscoveryState extends State<DeviceDiscovery>
               onPressed: isConnected
                   ? () {
                       Navigator.pop(context);
-                      Navigator.pushNamed(context, '/chat-interface');
+                      Navigator.pushNamed(context, '/bluebridge-chat');
                     }
                   : () {
                       Navigator.pop(context);
@@ -610,7 +610,6 @@ class _DeviceDiscoveryState extends State<DeviceDiscovery>
 
   Widget _buildContextMenuSheet(ScanResult scanResult) {
     final device = scanResult.device;
-    final deviceData = {'id': device.remoteId.toString()}; // For compatibility
 
     return Container(
       padding: EdgeInsets.all(6.w),
