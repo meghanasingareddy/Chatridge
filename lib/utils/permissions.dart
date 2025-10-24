@@ -1,0 +1,73 @@
+import 'package:permission_handler/permission_handler.dart';
+
+class Permissions {
+  // Check if storage permission is granted
+  static Future<bool> isStoragePermissionGranted() async {
+    final status = await Permission.storage.status;
+    return status == PermissionStatus.granted;
+  }
+
+  // Check if camera permission is granted
+  static Future<bool> isCameraPermissionGranted() async {
+    final status = await Permission.camera.status;
+    return status == PermissionStatus.granted;
+  }
+
+  // Check if photos permission is granted
+  static Future<bool> isPhotosPermissionGranted() async {
+    final status = await Permission.photos.status;
+    return status == PermissionStatus.granted;
+  }
+
+  // Request storage permission
+  static Future<bool> requestStoragePermission() async {
+    final status = await Permission.storage.request();
+    return status == PermissionStatus.granted;
+  }
+
+  // Request camera permission
+  static Future<bool> requestCameraPermission() async {
+    final status = await Permission.camera.request();
+    return status == PermissionStatus.granted;
+  }
+
+  // Request photos permission
+  static Future<bool> requestPhotosPermission() async {
+    final status = await Permission.photos.request();
+    return status == PermissionStatus.granted;
+  }
+
+  // Request all necessary permissions
+  static Future<Map<String, bool>> requestAllPermissions() async {
+    final results = <String, bool>{};
+
+    results['storage'] = await requestStoragePermission();
+    results['camera'] = await requestCameraPermission();
+    results['photos'] = await requestPhotosPermission();
+
+    return results;
+  }
+
+  // Check if all permissions are granted
+  static Future<bool> areAllPermissionsGranted() async {
+    final storage = await isStoragePermissionGranted();
+    final camera = await isCameraPermissionGranted();
+    final photos = await isPhotosPermissionGranted();
+
+    return storage && camera && photos;
+  }
+
+  // Open app settings
+  static Future<void> openAppSettings() async {
+    await openAppSettings();
+  }
+
+  // Check permission status with detailed info
+  static Future<Map<String, PermissionStatus>> getPermissionStatuses() async {
+    return {
+      'storage': await Permission.storage.status,
+      'camera': await Permission.camera.status,
+      'photos': await Permission.photos.status,
+    };
+  }
+}
