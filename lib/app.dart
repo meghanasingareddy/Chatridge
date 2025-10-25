@@ -116,7 +116,34 @@ class _AppState extends State<App> {
                     ),
                   ),
 
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 16),
+
+                  // Test Connection Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await connectivityProvider.refreshConnectivity();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              connectivityProvider.isConnectedToChatridge
+                                  ? 'Successfully connected to Chatridge!'
+                                  : 'Could not connect to Chatridge server. Please check your WiFi connection.',
+                            ),
+                            backgroundColor:
+                                connectivityProvider.isConnectedToChatridge
+                                    ? Colors.green
+                                    : Colors.orange,
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Test Connection'),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
 
                   // Start Button
                   SizedBox(

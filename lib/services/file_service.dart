@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart';
 import '../utils/constants.dart';
 import '../utils/helpers.dart';
 import '../utils/permissions.dart';
@@ -15,8 +16,8 @@ class FileService {
   // Pick file from device storage
   Future<File?> pickFile() async {
     try {
-      // Check permissions
-      if (!await Permissions.isStoragePermissionGranted()) {
+      // Check permissions (skip on web)
+      if (!kIsWeb && !await Permissions.isStoragePermissionGranted()) {
         final granted = await Permissions.requestStoragePermission();
         if (!granted) {
           throw Exception('Storage permission is required to pick files');
@@ -26,18 +27,30 @@ class FileService {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
-        withData: false,
+        withData: kIsWeb, // Use withData on web
         withReadStream: false,
       );
 
       if (result != null && result.files.isNotEmpty) {
-        final file = File(result.files.first.path!);
+        final pickedFile = result.files.first;
+
+        File file;
+        if (kIsWeb && pickedFile.bytes != null) {
+          // On web, create a temporary file from bytes
+          final tempDir = Directory.systemTemp;
+          final tempFile = File('${tempDir.path}/${pickedFile.name}');
+          await tempFile.writeAsBytes(pickedFile.bytes!);
+          file = tempFile;
+        } else {
+          file = File(pickedFile.path!);
+        }
 
         // Validate file size
         final fileSize = await file.length();
         if (fileSize > Constants.maxFileSizeMB * 1024 * 1024) {
           throw Exception(
-              'File size exceeds ${Constants.maxFileSizeMB}MB limit',);
+            'File size exceeds ${Constants.maxFileSizeMB}MB limit',
+          );
         }
 
         // Validate file type
@@ -56,8 +69,8 @@ class FileService {
   // Pick image from camera
   Future<File?> pickImageFromCamera() async {
     try {
-      // Check camera permission
-      if (!await Permissions.isCameraPermissionGranted()) {
+      // Check camera permission (skip on web)
+      if (!kIsWeb && !await Permissions.isCameraPermissionGranted()) {
         final granted = await Permissions.requestCameraPermission();
         if (!granted) {
           throw Exception('Camera permission is required to take photos');
@@ -78,13 +91,18 @@ class FileService {
         final fileSize = await file.length();
         if (fileSize > Constants.maxFileSizeMB * 1024 * 1024) {
           throw Exception(
-              'Image size exceeds ${Constants.maxFileSizeMB}MB limit',);
+            'Image size exceeds ${Constants.maxFileSizeMB}MB limit',
+          );
         }
 
         return file;
       }
       return null;
     } catch (e) {
+      if (kIsWeb) {
+        throw Exception(
+            'Camera not available on web. Please use "Choose from Gallery" instead.');
+      }
       throw Exception('Failed to capture image: $e');
     }
   }
@@ -92,8 +110,8 @@ class FileService {
   // Pick image from gallery
   Future<File?> pickImageFromGallery() async {
     try {
-      // Check photos permission
-      if (!await Permissions.isPhotosPermissionGranted()) {
+      // Check photos permission (skip on web)
+      if (!kIsWeb && !await Permissions.isPhotosPermissionGranted()) {
         final granted = await Permissions.requestPhotosPermission();
         if (!granted) {
           throw Exception('Photos permission is required to access gallery');
@@ -114,7 +132,8 @@ class FileService {
         final fileSize = await file.length();
         if (fileSize > Constants.maxFileSizeMB * 1024 * 1024) {
           throw Exception(
-              'Image size exceeds ${Constants.maxFileSizeMB}MB limit',);
+            'Image size exceeds ${Constants.maxFileSizeMB}MB limit',
+          );
         }
 
         return file;

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '../services/api_service.dart';
 
 class ConnectivityProvider extends ChangeNotifier {
   ConnectivityProvider() {
@@ -61,27 +62,40 @@ class ConnectivityProvider extends ChangeNotifier {
 
   Future<void> _checkSSID() async {
     try {
-      // Note: Getting SSID programmatically is limited on newer Android versions
-      // This is a simplified check - in a real app, you might need platform-specific code
+      debugPrint('Starting Chatridge connection test...');
+      // Test actual connection to ESP32 server instead of just checking SSID
+      final apiService = ApiService();
+      final isServerReachable = await apiService.testConnection();
+
+      _isConnectedToChatridge = isServerReachable;
+      _currentSSID = isServerReachable ? 'Chatridge' : 'Unknown';
+
+      debugPrint('Chatridge server reachable: $isServerReachable');
+      debugPrint(
+          'Connection status updated - isConnectedToChatridge: $_isConnectedToChatridge');
+    } catch (e) {
+      debugPrint('Error checking Chatridge connection: $e');
       _isConnectedToChatridge = false;
       _currentSSID = 'Unknown';
-
-      // For now, we'll assume the user is connected to Chatridge if they have internet
-      // In a real implementation, you'd need to check the actual SSID
-      // This is a limitation of the current approach
-    } catch (e) {
-      debugPrint('Error checking SSID: $e');
     }
   }
 
   // Manual check for Chatridge connection
   Future<bool> checkChatridgeConnection() async {
     try {
-      // This would typically involve checking the network configuration
-      // For now, we'll return false and let the user manually connect
-      return false;
+      final apiService = ApiService();
+      final isServerReachable = await apiService.testConnection();
+
+      _isConnectedToChatridge = isServerReachable;
+      _currentSSID = isServerReachable ? 'Chatridge' : 'Unknown';
+
+      notifyListeners();
+      return isServerReachable;
     } catch (e) {
       debugPrint('Error checking Chatridge connection: $e');
+      _isConnectedToChatridge = false;
+      _currentSSID = 'Unknown';
+      notifyListeners();
       return false;
     }
   }
@@ -91,6 +105,9 @@ class ConnectivityProvider extends ChangeNotifier {
     try {
       final connectivityResult = await _connectivity.checkConnectivity();
       await _updateConnectionStatus([connectivityResult]);
+
+      // Also test Chatridge connection specifically
+      await _checkSSID();
     } catch (e) {
       debugPrint('Error refreshing connectivity: $e');
     }

@@ -4,7 +4,9 @@ import '../providers/device_provider.dart';
 import '../models/device.dart';
 
 class DeviceList extends StatelessWidget {
-  const DeviceList({super.key});
+  const DeviceList({super.key, this.onDeviceSelected});
+
+  final Function(String?)? onDeviceSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +40,10 @@ class DeviceList extends StatelessWidget {
           itemCount: devices.length,
           itemBuilder: (context, index) {
             final device = devices[index];
-            return DeviceCard(device: device);
+            return DeviceCard(
+              device: device,
+              onDeviceSelected: onDeviceSelected,
+            );
           },
         );
       },
@@ -47,12 +52,119 @@ class DeviceList extends StatelessWidget {
 }
 
 class DeviceCard extends StatelessWidget {
-
   const DeviceCard({
     super.key,
     required this.device,
+    this.onDeviceSelected,
   });
   final Device device;
+  final Function(String?)? onDeviceSelected;
+
+  void _showPrivateMessageOptions(BuildContext context, Device device) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: device.isOnline
+                        ? Colors.green.shade100
+                        : Colors.grey.shade200,
+                    child: Icon(
+                      device.isOnline
+                          ? Icons.phone_android
+                          : Icons.phone_android_outlined,
+                      color: device.isOnline ? Colors.green : Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          device.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                        Text(
+                          device.isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            color: device.isOnline ? Colors.green : Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.message),
+              title: const Text('Send Private Message'),
+              onTap: () {
+                Navigator.pop(context);
+                // Trigger private messaging by calling a callback
+                _startPrivateMessage(context, device);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.info),
+              title: const Text('Device Info'),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeviceInfo(context, device);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _startPrivateMessage(BuildContext context, Device device) {
+    // Use the callback to notify parent widget
+    onDeviceSelected?.call(device.name);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Now messaging ${device.name} privately'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
+  void _showDeviceInfo(BuildContext context, Device device) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(device.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Status: ${device.isOnline ? "Online" : "Offline"}'),
+            Text('Last seen: ${device.statusText}'),
+            if (device.ip.isNotEmpty) Text('IP: ${device.ip}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,13 +175,8 @@ class DeviceCard extends StatelessWidget {
         elevation: 2,
         child: InkWell(
           onTap: () {
-            // TODO: Implement device selection for private messaging
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content:
-                    Text('Private messaging to ${device.name} not implemented'),
-              ),
-            );
+            // Implement device selection for private messaging
+            _showPrivateMessageOptions(context, device);
           },
           borderRadius: BorderRadius.circular(8),
           child: Padding(

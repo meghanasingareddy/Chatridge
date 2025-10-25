@@ -177,6 +177,10 @@ class ChatProvider extends ChangeNotifier {
       _error = null;
       notifyListeners();
 
+      debugPrint('ChatProvider: Starting file send');
+      debugPrint('File path: $filePath');
+      debugPrint('Username: $username, Target: $target');
+
       // Upload file to server
       final attachmentUrl = await _apiService.uploadFile(
         File(filePath),
@@ -184,6 +188,8 @@ class ChatProvider extends ChangeNotifier {
         target: target,
         onProgress: onProgress,
       );
+
+      debugPrint('ChatProvider: Upload result: $attachmentUrl');
 
       if (attachmentUrl != null) {
         // Create message with attachment
@@ -200,6 +206,9 @@ class ChatProvider extends ChangeNotifier {
 
         _messages.add(message);
         await StorageService.saveMessage(message);
+        debugPrint('ChatProvider: File message created and saved');
+      } else {
+        debugPrint('ChatProvider: File upload failed - no URL returned');
       }
 
       _isSending = false;
@@ -208,6 +217,7 @@ class ChatProvider extends ChangeNotifier {
     } catch (e) {
       _isSending = false;
       _error = e.toString();
+      debugPrint('ChatProvider: File send error: $e');
       notifyListeners();
       return false;
     }

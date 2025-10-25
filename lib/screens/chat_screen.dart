@@ -134,7 +134,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   bottom: BorderSide(color: Colors.grey.shade300),
                 ),
               ),
-              child: const DeviceList(),
+              child: DeviceList(
+                onDeviceSelected: _onTargetSelected,
+              ),
             ),
           ],
 

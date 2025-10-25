@@ -16,26 +16,37 @@ class ApiService {
   void initialize() {
     if (_isInitialized) return;
 
-    _dio = Dio(BaseOptions(
-      baseUrl: Constants.baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      sendTimeout: const Duration(seconds: 10),
-    ),);
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: Constants.baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        sendTimeout: const Duration(seconds: 10),
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      ),
+    );
 
     // Add interceptors for logging and error handling
-    _dio.interceptors.add(LogInterceptor(
-      requestBody: false,
-      responseBody: false,
-      logPrint: (obj) => debugPrint('API: $obj'),
-    ),);
+    _dio.interceptors.add(
+      LogInterceptor(
+        requestBody: false,
+        responseBody: false,
+        logPrint: (obj) => debugPrint('API: $obj'),
+      ),
+    );
 
-    _dio.interceptors.add(InterceptorsWrapper(
-      onError: (error, handler) {
-        debugPrint('API Error: ${error.message}');
-        handler.next(error);
-      },
-    ),);
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onError: (error, handler) {
+          debugPrint('API Error: ${error.message}');
+          handler.next(error);
+        },
+      ),
+    );
 
     _isInitialized = true;
   }
@@ -130,6 +141,10 @@ class ApiService {
     try {
       initialize();
 
+      debugPrint('Starting file upload: ${file.path}');
+      debugPrint('File size: ${await file.length()} bytes');
+      debugPrint('Username: $username, Target: $target');
+
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(
           file.path,
@@ -139,19 +154,30 @@ class ApiService {
         if (target != null && target.isNotEmpty) 'target': target,
       });
 
+      debugPrint('Sending upload request to: ${Constants.uploadEndpoint}');
       final response = await _dio.post(
         Constants.uploadEndpoint,
         data: formData,
         onSendProgress: onProgress,
       );
 
+      debugPrint('Upload response status: ${response.statusCode}');
+      debugPrint('Upload response data: ${response.data}');
+
       if (response.statusCode == 200) {
-        return response.data['url'] ?? response.data['attachment_url'];
+        final url = response.data['url'] ??
+            response.data['attachment_url'] ??
+            response.data['filename'];
+        debugPrint('Upload successful, URL: $url');
+        return url;
       }
-      throw Exception('Upload failed');
+      throw Exception('Upload failed with status: ${response.statusCode}');
     } on DioException catch (e) {
+      debugPrint('Upload DioException: ${e.message}');
+      debugPrint('Upload DioException type: ${e.type}');
       throw _handleDioError(e);
     } catch (e) {
+      debugPrint('Upload error: $e');
       throw Exception('Upload error: $e');
     }
   }
@@ -160,9 +186,29 @@ class ApiService {
   Future<bool> testConnection() async {
     try {
       initialize();
-      final response = await _dio.get('/');
-      return response.statusCode == 200;
+      debugPrint('Testing connection to: ${Constants.baseUrl}');
+
+      // Try multiple endpoints to test connection
+      final endpoints = ['/', '/messages', '/devices'];
+
+      for (String endpoint in endpoints) {
+        try {
+          debugPrint('Testing endpoint: $endpoint');
+          final response = await _dio.get(endpoint);
+          debugPrint(
+              'Connection test response for $endpoint: ${response.statusCode}');
+          if (response.statusCode == 200) {
+            return true;
+          }
+        } catch (e) {
+          debugPrint('Endpoint $endpoint failed: $e');
+          // Continue to next endpoint
+        }
+      }
+
+      return false;
     } catch (e) {
+      debugPrint('Connection test failed: $e');
       return false;
     }
   }
@@ -174,17 +220,20 @@ class ApiService {
       case DioExceptionType.sendTimeout:
       case DioExceptionType.receiveTimeout:
         return Exception(
-            'Connection timeout. Please check your network connection.',);
+          'Connection timeout. Please check your network connection.',
+        );
 
       case DioExceptionType.connectionError:
         return Exception(
-            'Cannot connect to Chatridge server. Please ensure you are connected to the Chatridge WiFi network.',);
+          'Cannot connect to Chatridge server. Please ensure you are connected to the Chatridge WiFi network.',
+        );
 
       case DioExceptionType.badResponse:
         final statusCode = error.response?.statusCode;
         if (statusCode == 404) {
           return Exception(
-              'Chatridge server not found. Please check your connection.',);
+            'Chatridge server not found. Please check your connection.',
+          );
         } else if (statusCode == 500) {
           return Exception('Server error. Please try again later.');
         }
