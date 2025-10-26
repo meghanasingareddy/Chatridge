@@ -1,5 +1,6 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 class Permissions {
   // Check if storage permission is granted
@@ -28,8 +29,15 @@ class Permissions {
   static Future<bool> isPhotosPermissionGranted() async {
     if (kIsWeb) return true; // Web doesn't need photos permission
     try {
-      final status = await Permission.photos.status;
-      return status == PermissionStatus.granted;
+      // Try photos permission first (Android 13+)
+      try {
+        final status = await Permission.photos.status;
+        return status == PermissionStatus.granted;
+      } catch (e) {
+        // Fallback to storage permission for older Android versions
+        final status = await Permission.storage.status;
+        return status == PermissionStatus.granted;
+      }
     } catch (e) {
       return true; // Assume granted if permission check fails
     }
@@ -61,8 +69,15 @@ class Permissions {
   static Future<bool> requestPhotosPermission() async {
     if (kIsWeb) return true; // Web doesn't need photos permission
     try {
-      final status = await Permission.photos.request();
-      return status == PermissionStatus.granted;
+      // Try photos permission first (Android 13+)
+      try {
+        final status = await Permission.photos.request();
+        return status == PermissionStatus.granted;
+      } catch (e) {
+        // Fallback to storage permission for older Android versions
+        final status = await Permission.storage.request();
+        return status == PermissionStatus.granted;
+      }
     } catch (e) {
       return true; // Assume granted if permission request fails
     }
@@ -102,6 +117,33 @@ class Permissions {
     } catch (e) {
       // Ignore errors on web
     }
+  }
+
+  // Show permission dialog
+  static Future<bool> showPermissionDialog(
+    BuildContext context, {
+    required String title,
+    required String message,
+    required String permissionType,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Grant Permission'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   // Check permission status with detailed info

@@ -138,6 +138,7 @@ class DeviceCard extends StatelessWidget {
       SnackBar(
         content: Text('Now messaging ${device.name} privately'),
         backgroundColor: Colors.blue,
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -180,9 +181,10 @@ class DeviceCard extends StatelessWidget {
           },
           borderRadius: BorderRadius.circular(8),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(8),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Device Icon
                 CircleAvatar(

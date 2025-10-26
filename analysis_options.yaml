@@ -32,7 +32,7 @@ linter:
     use_super_parameters: true
     use_test_throws_matchers: true
     use_to_and_as_if_applicable: true
-    use_void_to_return_from_futures: true
+    1use_void_to_return_from_futures: true
     void_checks: true
 
 analyzer:

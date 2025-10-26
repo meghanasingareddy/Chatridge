@@ -114,7 +114,8 @@ class FileService {
       if (!kIsWeb && !await Permissions.isPhotosPermissionGranted()) {
         final granted = await Permissions.requestPhotosPermission();
         if (!granted) {
-          throw Exception('Photos permission is required to access gallery');
+          throw Exception(
+              'Photo permission is required to access gallery. Please grant permission in settings.');
         }
       }
 

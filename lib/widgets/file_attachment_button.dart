@@ -143,9 +143,15 @@ class FileAttachmentButton extends StatelessWidget {
         onFileSelected?.call(file);
       }
     } catch (e) {
+      // Show more user-friendly error message for permission issues
+      String errorMessage = e.toString();
+      if (errorMessage.contains('permission')) {
+        errorMessage =
+            'Permission required to access gallery. Please grant photo permission in settings.';
+      }
       Helpers.showSnackBar(
         context,
-        'Error picking image: $e',
+        'Error picking image: $errorMessage',
         color: Colors.red,
       );
     }

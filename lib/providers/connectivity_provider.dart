@@ -8,7 +8,7 @@ class ConnectivityProvider extends ChangeNotifier {
     _initializeConnectivity();
   }
   final Connectivity _connectivity = Connectivity();
-  StreamSubscription<ConnectivityResult>? _connectivitySubscription;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   bool _isConnected = false;
   bool _isConnectedToChatridge = false;
@@ -22,7 +22,7 @@ class ConnectivityProvider extends ChangeNotifier {
 
   void _initializeConnectivity() {
     _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
-      (ConnectivityResult result) => _updateConnectionStatus([result]),
+      (List<ConnectivityResult> results) => _updateConnectionStatus(results),
     );
 
     // Check initial connectivity
@@ -31,8 +31,8 @@ class ConnectivityProvider extends ChangeNotifier {
 
   Future<void> _checkInitialConnectivity() async {
     try {
-      final connectivityResult = await _connectivity.checkConnectivity();
-      await _updateConnectionStatus([connectivityResult]);
+      final connectivityResults = await _connectivity.checkConnectivity();
+      await _updateConnectionStatus(connectivityResults);
     } catch (e) {
       debugPrint('Error checking initial connectivity: $e');
     }
@@ -103,8 +103,8 @@ class ConnectivityProvider extends ChangeNotifier {
   // Force refresh connectivity status
   Future<void> refreshConnectivity() async {
     try {
-      final connectivityResult = await _connectivity.checkConnectivity();
-      await _updateConnectionStatus([connectivityResult]);
+      final connectivityResults = await _connectivity.checkConnectivity();
+      await _updateConnectionStatus(connectivityResults);
 
       // Also test Chatridge connection specifically
       await _checkSSID();

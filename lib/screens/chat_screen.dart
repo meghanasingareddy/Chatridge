@@ -128,7 +128,7 @@ class _ChatScreenState extends State<ChatScreen> {
           // Device List
           if (_showDevices) ...[
             Container(
-              height: 100,
+              height: 120,
               decoration: BoxDecoration(
                 border: Border(
                   bottom: BorderSide(color: Colors.grey.shade300),

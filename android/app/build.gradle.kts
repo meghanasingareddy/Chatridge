@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.chatridge.app"
+    namespace = "com.chatridge.chatridge"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.chatridge.app"
+        applicationId = "com.chatridge.chatridge"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
