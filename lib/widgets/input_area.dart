@@ -136,6 +136,7 @@ class _InputAreaState extends State<InputArea> {
             target: widget.selectedTarget,
             onProgress: (sent, total) {
               // TODO: Show upload progress
+              debugPrint('Upload progress: $sent/$total');
             },
           );
 
@@ -149,14 +150,30 @@ class _InputAreaState extends State<InputArea> {
       } else {
         Helpers.showSnackBar(
           context,
-          'Failed to send file',
+          'Failed to send file - check connection and try again',
           color: Colors.red,
         );
       }
     } catch (e) {
+      String errorMessage = e.toString();
+
+      // Provide more specific error messages
+      if (errorMessage.contains('timeout')) {
+        errorMessage =
+            'Upload timeout - try a smaller file or check connection';
+      } else if (errorMessage.contains('too large')) {
+        errorMessage = 'File too large - maximum size is 10MB';
+      } else if (errorMessage.contains('connection')) {
+        errorMessage = 'Cannot connect to server - check WiFi connection';
+      } else if (errorMessage.contains('permission')) {
+        errorMessage = 'Permission denied - check app permissions';
+      } else if (errorMessage.contains('not supported')) {
+        errorMessage = 'File type not supported';
+      }
+
       Helpers.showSnackBar(
         context,
-        'Error sending file: $e',
+        'Error sending file: $errorMessage',
         color: Colors.red,
       );
     } finally {

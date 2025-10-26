@@ -145,6 +145,21 @@ class ApiService {
       debugPrint('File size: ${await file.length()} bytes');
       debugPrint('Username: $username, Target: $target');
 
+      // Check if file exists and is readable
+      if (!await file.exists()) {
+        throw Exception('File does not exist: ${file.path}');
+      }
+
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        throw Exception('File is empty: ${file.path}');
+      }
+
+      if (fileSize > Constants.maxFileSizeMB * 1024 * 1024) {
+        throw Exception(
+            'File too large: ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB (max: ${Constants.maxFileSizeMB}MB)');
+      }
+
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(
           file.path,
@@ -155,7 +170,46 @@ class ApiService {
       });
 
       debugPrint('Sending upload request to: ${Constants.uploadEndpoint}');
-      final response = await _dio.post(
+
+      // Create a new Dio instance with longer timeout for file uploads
+      final uploadDio = Dio(
+        BaseOptions(
+          baseUrl: Constants.baseUrl,
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 60),
+          sendTimeout: const Duration(seconds: 60),
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type',
+          },
+        ),
+      );
+
+      // Add request interceptor for debugging
+      uploadDio.interceptors.add(
+        InterceptorsWrapper(
+          onRequest: (options, handler) {
+            debugPrint('Upload request: ${options.method} ${options.path}');
+            debugPrint('Upload headers: ${options.headers}');
+            debugPrint('Upload data type: ${options.data.runtimeType}');
+            handler.next(options);
+          },
+          onResponse: (response, handler) {
+            debugPrint('Upload response: ${response.statusCode}');
+            debugPrint('Upload response data: ${response.data}');
+            handler.next(response);
+          },
+          onError: (error, handler) {
+            debugPrint('Upload error: ${error.message}');
+            debugPrint('Upload error type: ${error.type}');
+            debugPrint('Upload error response: ${error.response?.data}');
+            handler.next(error);
+          },
+        ),
+      );
+
+      final response = await uploadDio.post(
         Constants.uploadEndpoint,
         data: formData,
         onSendProgress: onProgress,
@@ -165,17 +219,59 @@ class ApiService {
       debugPrint('Upload response data: ${response.data}');
 
       if (response.statusCode == 200) {
-        final url = response.data['url'] ??
-            response.data['attachment_url'] ??
-            response.data['filename'];
-        debugPrint('Upload successful, URL: $url');
-        return url;
+        // Try different possible response formats from ESP32
+        String? url;
+        if (response.data is Map) {
+          final data = response.data as Map<String, dynamic>;
+          url = data['url'] ??
+              data['filename'] ??
+              data['file_url'] ??
+              data['attachment_url'];
+        } else if (response.data is String) {
+          // If response is just a string, it might be the filename
+          url = response.data;
+        }
+
+        if (url != null) {
+          debugPrint('Upload successful, URL: $url');
+          return url;
+        } else {
+          // If no URL in response, create one based on filename
+          final filename = file.path.split('/').last;
+          url = '/$filename';
+          debugPrint('Upload successful, created URL: $url');
+          return url;
+        }
+      } else if (response.statusCode == 413) {
+        throw Exception('File too large for server');
+      } else if (response.statusCode == 415) {
+        throw Exception('File type not supported');
+      } else {
+        throw Exception('Upload failed with status: ${response.statusCode}');
       }
-      throw Exception('Upload failed with status: ${response.statusCode}');
     } on DioException catch (e) {
       debugPrint('Upload DioException: ${e.message}');
       debugPrint('Upload DioException type: ${e.type}');
-      throw _handleDioError(e);
+      debugPrint('Upload DioException response: ${e.response?.data}');
+
+      if (e.type == DioExceptionType.connectionTimeout) {
+        throw Exception(
+            'Upload timeout - file may be too large or connection too slow');
+      } else if (e.type == DioExceptionType.connectionError) {
+        throw Exception('Cannot connect to server - check WiFi connection');
+      } else if (e.type == DioExceptionType.badResponse) {
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 404) {
+          throw Exception(
+              'Upload endpoint not found - ESP32 server may not support file uploads');
+        } else if (statusCode == 500) {
+          throw Exception(
+              'Server error during upload - ESP32 may be out of storage');
+        }
+        throw Exception('Upload failed with status: $statusCode');
+      } else {
+        throw Exception('Upload failed: ${e.message}');
+      }
     } catch (e) {
       debugPrint('Upload error: $e');
       throw Exception('Upload error: $e');

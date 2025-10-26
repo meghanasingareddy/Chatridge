@@ -18,6 +18,7 @@
         "open_file",
         "path_provider",
         "permission_handler",
+        "photo_view",
         "provider",
         "shared_preferences"
       ],
@@ -108,6 +109,13 @@
       "name": "cupertino_icons",
       "version": "1.0.8",
       "dependencies": []
+    },
+    {
+      "name": "photo_view",
+      "version": "0.14.0",
+      "dependencies": [
+        "flutter"
+      ]
     },
     {
       "name": "open_file",

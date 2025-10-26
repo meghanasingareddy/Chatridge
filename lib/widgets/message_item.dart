@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import '../models/message.dart';
 import '../utils/helpers.dart';
+import '../screens/image_viewer_screen.dart';
 
 class MessageItem extends StatelessWidget {
-
   const MessageItem({
     super.key,
     required this.message,
@@ -164,9 +164,13 @@ class MessageItem extends StatelessWidget {
   Widget _buildImageAttachment(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // TODO: Implement image viewer
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Image viewer not implemented')),
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ImageViewerScreen(
+              imageUrl: message.attachmentUrl!,
+              imageName: message.attachmentName,
+            ),
+          ),
         );
       },
       child: Container(
@@ -183,11 +187,31 @@ class MessageItem extends StatelessWidget {
           child: Image.network(
             message.attachmentUrl!,
             fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                height: 100,
+                color: Colors.grey.shade200,
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              );
+            },
             errorBuilder: (context, error, stackTrace) {
               return Container(
                 height: 100,
                 color: Colors.grey.shade200,
-                child: const Icon(Icons.broken_image),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.broken_image),
+                    SizedBox(height: 4),
+                    Text(
+                      'Failed to load',
+                      style: TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
               );
             },
           ),
