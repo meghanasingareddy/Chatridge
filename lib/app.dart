@@ -39,9 +39,8 @@ class _AppState extends State<App> {
   Widget build(BuildContext context) {
     return Consumer<ConnectivityProvider>(
       builder: (context, connectivityProvider, child) {
-        if (!connectivityProvider.isConnectedToChatridge) {
-          return const ConnectScreen();
-        }
+        // Allow app to open offline and show stored chats.
+        // If not connected, user can still navigate to Connect from Settings.
         return Scaffold(
           body: SafeArea(
             child: Padding(

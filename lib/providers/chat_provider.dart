@@ -228,7 +228,15 @@ class ChatProvider extends ChangeNotifier {
     if (target == null || target.isEmpty) {
       return _messages.where((msg) => !msg.isPrivate).toList();
     }
-    return _messages.where((msg) => msg.target == target).toList();
+    // Show a 1:1 thread view: messages I sent to target, plus messages sent to me (by anyone)
+    // This ensures the receiver sees private messages addressed to their device name
+    final myDeviceName = StorageService.getDeviceName();
+    return _messages.where((msg) {
+      if (!msg.isPrivate) return false;
+      final sentToPeer = msg.target == target;
+      final sentToMe = myDeviceName != null && msg.target == myDeviceName;
+      return sentToPeer || sentToMe;
+    }).toList();
   }
 
   // Clear messages
