@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include <SPIFFS.h>
 
 // AP credentials
 const char* ssid = "Chatridge";
@@ -14,6 +15,9 @@ struct Message {
   String text;
   String target; // empty for public
   unsigned long ts;
+  String attachmentUrl;
+  String attachmentName;
+  String attachmentType;
 };
 
 struct DeviceInfo {
@@ -27,6 +31,10 @@ int messageCount = 0;
 
 DeviceInfo devices[50];
 int deviceCount = 0;
+
+// Upload state
+File uploadFile;
+String lastUploadedFileName;
 
 String genId() {
   return String(millis());
@@ -71,6 +79,7 @@ void handleDevices() {
     bool isOnline = (now - devices[i].lastSeen) < 15000; // 15s
     json += "{\"name\":\"" + devices[i].name + "\",";
     json += "\"ip\":\"" + devices[i].ip + "\",";
+    json += "\"last_seen\":" + String(devices[i].lastSeen) + ",";
     json += "\"online\":" + String(isOnline ? "true" : "false") + "}";
   }
   json += "]";
@@ -87,7 +96,13 @@ void handleMessages() {
     if (messages[i].target.length() > 0) {
       json += "\"target\":\"" + messages[i].target + "\",";
     }
-    json += "\"timestamp\":" + String(messages[i].ts) + "}";
+    json += "\"timestamp\":" + String(messages[i].ts);
+    if (messages[i].attachmentUrl.length() > 0) {
+      json += ",\"attachment_url\":\"" + messages[i].attachmentUrl + "\",";
+      json += "\"attachment_name\":\"" + messages[i].attachmentName + "\",";
+      json += "\"attachment_type\":\"" + messages[i].attachmentType + "\"";
+    }
+    json += "}";
   }
   json += "]";
   server.send(200, "application/json", json);
@@ -125,10 +140,95 @@ void handleSend() {
   server.send(200, "application/json", json);
 }
 
+// ===== Upload handlers =====
+void handleFileUpload() {
+  HTTPUpload &upload = server.upload();
+  if (upload.status == UPLOAD_FILE_START) {
+    String filename = "/" + upload.filename;
+    lastUploadedFileName = filename;
+    if (SPIFFS.exists(filename)) {
+      SPIFFS.remove(filename);
+    }
+    uploadFile = SPIFFS.open(filename, FILE_WRITE);
+  } else if (upload.status == UPLOAD_FILE_WRITE) {
+    if (uploadFile) {
+      uploadFile.write(upload.buf, upload.currentSize);
+    }
+  } else if (upload.status == UPLOAD_FILE_END) {
+    if (uploadFile) {
+      uploadFile.close();
+    }
+  }
+}
+
+String detectContentType(const String &fname) {
+  String f = fname;
+  if (f.endsWith(".png")) return "image/png";
+  if (f.endsWith(".jpg") || f.endsWith(".jpeg")) return "image/jpeg";
+  if (f.endsWith(".gif")) return "image/gif";
+  if (f.endsWith(".pdf")) return "application/pdf";
+  if (f.endsWith(".ppt")) return "application/vnd.ms-powerpoint";
+  if (f.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  if (f.endsWith(".doc")) return "application/msword";
+  if (f.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (f.endsWith(".xls")) return "application/vnd.ms-excel";
+  if (f.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  if (f.endsWith(".csv")) return "text/csv";
+  if (f.endsWith(".txt")) return "text/plain";
+  return "application/octet-stream";
+}
+
+void handleUploadRespond() {
+  // Build response and also append a message so others see the attachment
+  if (lastUploadedFileName.length() == 0) {
+    server.send(400, "application/json", "{\"error\":\"no file uploaded\"}");
+    return;
+  }
+
+  String url = lastUploadedFileName; // e.g. /image.jpg
+  String fname = lastUploadedFileName.substring(1); // strip leading '/'
+  String ctype = detectContentType(lastUploadedFileName);
+
+  // Append a message representing this file upload
+  if (messageCount >= 200) {
+    for (int i = 1; i < 200; i++) messages[i - 1] = messages[i];
+    messageCount = 199;
+  }
+  Message m;
+  m.id = genId();
+  m.username = server.hasArg("username") ? server.arg("username") : "Unknown";
+  m.text = "Shared a file";
+  m.target = server.hasArg("target") ? server.arg("target") : "";
+  m.ts = millis();
+  m.attachmentUrl = url;
+  m.attachmentName = fname;
+  m.attachmentType = ctype;
+  messages[messageCount++] = m;
+
+  addOrUpdateDevice(m.username, server.client().remoteIP().toString());
+
+  String json = String("{\"status\":\"ok\",\"url\":\"") + url + "\"}";
+  server.send(200, "application/json", json);
+}
+
+// Serve uploaded files (fallback)
+void handleFileGet() {
+  String path = server.uri();
+  if (path == "/") { server.send(404, "text/plain", "Not found"); return; }
+  if (!SPIFFS.exists(path)) { server.send(404, "text/plain", "Not found"); return; }
+  File f = SPIFFS.open(path, FILE_READ);
+  String ct = detectContentType(path);
+  server.streamFile(f, ct);
+  f.close();
+}
+
 void setup() {
   WiFi.mode(WIFI_AP);
   WiFi.softAP(ssid, password);
   IPAddress IP = WiFi.softAPIP();
+
+  // Init filesystem for uploads
+  SPIFFS.begin(true);
 
   server.enableCORS(true);
   server.on("/", HTTP_GET, handleRoot);
@@ -136,11 +236,14 @@ void setup() {
   server.on("/devices", HTTP_GET, handleDevices);
   server.on("/messages", HTTP_GET, handleMessages);
   server.on("/send", HTTP_GET, handleSend);
+  server.on("/upload", HTTP_POST, handleUploadRespond, handleFileUpload);
+  server.onNotFound(handleFileGet);
   server.begin();
 }
 
 void loop() {
   server.handleClient();
 }
+
 
 
