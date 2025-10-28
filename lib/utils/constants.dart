@@ -28,6 +28,11 @@ class Constants {
     'pdf',
     'doc',
     'docx',
+    'ppt',
+    'pptx',
+    'xls',
+    'xlsx',
+    'csv',
     'txt',
     'rtf',
   ];
