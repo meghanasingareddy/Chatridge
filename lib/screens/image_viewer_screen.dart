@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'dart:io';
 
 class ImageViewerScreen extends StatelessWidget {
   const ImageViewerScreen({
@@ -25,11 +28,22 @@ class ImageViewerScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.download),
-            onPressed: () {
-              // TODO: Implement download functionality
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Download not implemented')),
-              );
+            onPressed: () async {
+              try {
+                final tempDir = await getTemporaryDirectory();
+                final fileName = imageName ?? 'image.jpg';
+                final savePath = '${tempDir.path}/$fileName';
+                await Dio().download(imageUrl, savePath);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Downloaded to $savePath')),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Download failed: $e')),
+                );
+              }
             },
           ),
         ],

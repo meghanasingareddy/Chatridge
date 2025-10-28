@@ -3,6 +3,7 @@ import 'package:open_file/open_file.dart';
 import '../models/message.dart';
 import '../utils/helpers.dart';
 import '../screens/image_viewer_screen.dart';
+import '../utils/constants.dart';
 
 class MessageItem extends StatelessWidget {
   const MessageItem({
@@ -162,12 +163,15 @@ class MessageItem extends StatelessWidget {
   }
 
   Widget _buildImageAttachment(BuildContext context) {
+    final String resolvedUrl = message.attachmentUrl!.startsWith('http')
+        ? message.attachmentUrl!
+        : "${Constants.baseUrl}${message.attachmentUrl}";
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => ImageViewerScreen(
-              imageUrl: message.attachmentUrl!,
+              imageUrl: resolvedUrl,
               imageName: message.attachmentName,
             ),
           ),
@@ -185,7 +189,7 @@ class MessageItem extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
           child: Image.network(
-            message.attachmentUrl!,
+            resolvedUrl,
             fit: BoxFit.cover,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
