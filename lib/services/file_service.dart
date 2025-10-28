@@ -15,53 +15,52 @@ class FileService {
 
   // Pick file from device storage
   Future<File?> pickFile() async {
-    try {
-      // Check permissions (skip on web)
-      if (!kIsWeb && !await Permissions.isStoragePermissionGranted()) {
-        final granted = await Permissions.requestStoragePermission();
-        if (!granted) {
-          throw Exception('Storage permission is required to pick files');
-        }
-      }
-
+    Future<File?> doPick() async {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.any,
         allowMultiple: false,
-        withData: kIsWeb, // Use withData on web
+        withData: kIsWeb,
         withReadStream: false,
       );
+      if (result == null || result.files.isEmpty) return null;
 
-      if (result != null && result.files.isNotEmpty) {
-        final pickedFile = result.files.first;
-
-        File file;
-        if (kIsWeb && pickedFile.bytes != null) {
-          // On web, create a temporary file from bytes
-          final tempDir = Directory.systemTemp;
-          final tempFile = File('${tempDir.path}/${pickedFile.name}');
-          await tempFile.writeAsBytes(pickedFile.bytes!);
-          file = tempFile;
-        } else {
-          file = File(pickedFile.path!);
+      final pickedFile = result.files.first;
+      File file;
+      if (kIsWeb && pickedFile.bytes != null) {
+        final tempDir = Directory.systemTemp;
+        final tempFile = File('${tempDir.path}/${pickedFile.name}');
+        await tempFile.writeAsBytes(pickedFile.bytes!);
+        file = tempFile;
+      } else {
+        if (pickedFile.path == null) {
+          throw Exception('No file path returned');
         }
-
-        // Validate file size
-        final fileSize = await file.length();
-        if (fileSize > Constants.maxFileSizeMB * 1024 * 1024) {
-          throw Exception(
-            'File size exceeds ${Constants.maxFileSizeMB}MB limit',
-          );
-        }
-
-        // Validate file type
-        if (!Helpers.isAllowedFileType(file.path)) {
-          throw Exception('File type not supported');
-        }
-
-        return file;
+        file = File(pickedFile.path!);
       }
-      return null;
+
+      final fileSize = await file.length();
+      if (fileSize > Constants.maxFileSizeMB * 1024 * 1024) {
+        throw Exception('File size exceeds ${Constants.maxFileSizeMB}MB limit');
+      }
+      if (!Helpers.isAllowedFileType(file.path)) {
+        throw Exception('File type not supported');
+      }
+      return file;
+    }
+
+    try {
+      // Try without pre-requesting permission (many devices allow picker UI)
+      return await doPick();
     } catch (e) {
+      // If permission-related, request then retry once
+      final message = e.toString().toLowerCase();
+      if (!kIsWeb &&
+          (message.contains('permission') || message.contains('denied'))) {
+        final granted = await Permissions.requestStoragePermission();
+        if (granted) {
+          return await doPick();
+        }
+      }
       throw Exception('Failed to pick file: $e');
     }
   }
@@ -101,7 +100,7 @@ class FileService {
     } catch (e) {
       if (kIsWeb) {
         throw Exception(
-            'Camera not available on web. Please use "Choose from Gallery" instead.');
+            'Camera not available on web. Please use "Choose from Gallery" instead.',);
       }
       throw Exception('Failed to capture image: $e');
     }
@@ -115,7 +114,7 @@ class FileService {
         final granted = await Permissions.requestPhotosPermission();
         if (!granted) {
           throw Exception(
-              'Photo permission is required to access gallery. Please grant permission in settings.');
+              'Photo permission is required to access gallery. Please grant permission in settings.',);
         }
       }
 

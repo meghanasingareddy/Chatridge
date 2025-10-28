@@ -82,7 +82,7 @@ class _ConnectScreenState extends State<ConnectScreen> {
                       width: 16,
                       height: 16,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white),
+                          strokeWidth: 2, color: Colors.white,),
                     )
                   : const Icon(Icons.wifi),
               label: const Text('Connect to Chatridge AP'),
@@ -104,3 +104,4 @@ class _ConnectScreenState extends State<ConnectScreen> {
     );
   }
 }
+

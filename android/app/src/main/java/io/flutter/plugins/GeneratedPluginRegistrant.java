@@ -55,5 +55,10 @@ public final class GeneratedPluginRegistrant {
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin shared_preferences_android, io.flutter.plugins.sharedpreferences.SharedPreferencesPlugin", e);
     }
+    try {
+      flutterEngine.getPlugins().add(new com.alternadom.wifiiot.WifiIotPlugin());
+    } catch (Exception e) {
+      Log.e(TAG, "Error registering plugin wifi_iot, com.alternadom.wifiiot.WifiIotPlugin", e);
+    }
   }
 }

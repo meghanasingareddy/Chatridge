@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 
 class ImageViewerScreen extends StatelessWidget {
   const ImageViewerScreen({

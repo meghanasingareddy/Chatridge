@@ -72,7 +72,7 @@ class ConnectivityProvider extends ChangeNotifier {
 
       debugPrint('Chatridge server reachable: $isServerReachable');
       debugPrint(
-          'Connection status updated - isConnectedToChatridge: $_isConnectedToChatridge');
+          'Connection status updated - isConnectedToChatridge: $_isConnectedToChatridge',);
     } catch (e) {
       debugPrint('Error checking Chatridge connection: $e');
       _isConnectedToChatridge = false;

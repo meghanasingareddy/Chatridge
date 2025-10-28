@@ -5,13 +5,14 @@ import 'package:wifi_iot/wifi_iot.dart';
 import '../utils/constants.dart';
 
 class WifiService {
+  factory WifiService() => _instance;
   WifiService._internal();
   static final WifiService _instance = WifiService._internal();
-  factory WifiService() => _instance;
 
   Future<bool> ensureConnectedToEsp() async {
-    if (kIsWeb)
+    if (kIsWeb) {
       return true; // Web cannot manage Wi‑Fi; assume manual connection
+    }
 
     try {
       final isEnabled = await WiFiForIoTPlugin.isEnabled();
@@ -49,3 +50,4 @@ class WifiService {
     }
   }
 }
+

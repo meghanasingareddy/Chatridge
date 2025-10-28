@@ -18,7 +18,7 @@ class DeviceList extends StatelessWidget {
         if (!isConnected) {
           return const Center(
             child: Text('Connect to Chatridge to see devices',
-                style: TextStyle(color: Colors.grey)),
+                style: TextStyle(color: Colors.grey),),
           );
         }
         final devices = deviceProvider.devices;

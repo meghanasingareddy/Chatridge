@@ -238,7 +238,8 @@ class MessageItem extends StatelessWidget {
           // Download to temp then open
           // ignore: use_build_context_synchronously
           final tempDir = await getTemporaryDirectory();
-          final savePath = '${tempDir.path}/${message.attachmentName ?? 'file'}';
+          final savePath =
+              '${tempDir.path}/${message.attachmentName ?? 'file'}';
           await Dio().download(encoded, savePath);
           await OpenFile.open(savePath);
         } catch (e) {

@@ -10,7 +10,7 @@ void handleFileUpload() {
     if (filename.length() == 0) {
       filename = "file_" + String(millis()) + ".bin";
     }
-    
+     
     // Create file path
     filepath = "/" + filename;
     Serial.println("File upload started: " + filename);

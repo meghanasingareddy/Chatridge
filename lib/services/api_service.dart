@@ -157,7 +157,7 @@ class ApiService {
 
       if (fileSize > Constants.maxFileSizeMB * 1024 * 1024) {
         throw Exception(
-            'File too large: ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB (max: ${Constants.maxFileSizeMB}MB)');
+            'File too large: ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB (max: ${Constants.maxFileSizeMB}MB)',);
       }
 
       final formData = FormData.fromMap({
@@ -256,17 +256,17 @@ class ApiService {
 
       if (e.type == DioExceptionType.connectionTimeout) {
         throw Exception(
-            'Upload timeout - file may be too large or connection too slow');
+            'Upload timeout - file may be too large or connection too slow',);
       } else if (e.type == DioExceptionType.connectionError) {
         throw Exception('Cannot connect to server - check WiFi connection');
       } else if (e.type == DioExceptionType.badResponse) {
         final statusCode = e.response?.statusCode;
         if (statusCode == 404) {
           throw Exception(
-              'Upload endpoint not found - ESP32 server may not support file uploads');
+              'Upload endpoint not found - ESP32 server may not support file uploads',);
         } else if (statusCode == 500) {
           throw Exception(
-              'Server error during upload - ESP32 may be out of storage');
+              'Server error during upload - ESP32 may be out of storage',);
         }
         throw Exception('Upload failed with status: $statusCode');
       } else {
@@ -292,7 +292,7 @@ class ApiService {
           debugPrint('Testing endpoint: $endpoint');
           final response = await _dio.get(endpoint);
           debugPrint(
-              'Connection test response for $endpoint: ${response.statusCode}');
+              'Connection test response for $endpoint: ${response.statusCode}',);
           if (response.statusCode == 200) {
             return true;
           }

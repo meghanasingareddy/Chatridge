@@ -20,7 +20,8 @@
         "permission_handler",
         "photo_view",
         "provider",
-        "shared_preferences"
+        "shared_preferences",
+        "wifi_iot"
       ],
       "devDependencies": [
         "build_runner",
@@ -227,6 +228,13 @@
         "shared_preferences_platform_interface",
         "shared_preferences_web",
         "shared_preferences_windows"
+      ]
+    },
+    {
+      "name": "wifi_iot",
+      "version": "0.3.19+2",
+      "dependencies": [
+        "flutter"
       ]
     },
     {
