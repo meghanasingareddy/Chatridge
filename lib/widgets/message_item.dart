@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/message.dart';
 import '../utils/helpers.dart';
 import '../screens/image_viewer_screen.dart';
@@ -163,9 +165,10 @@ class MessageItem extends StatelessWidget {
   }
 
   Widget _buildImageAttachment(BuildContext context) {
-    final String resolvedUrl = message.attachmentUrl!.startsWith('http')
+    String resolvedUrl = message.attachmentUrl!.startsWith('http')
         ? message.attachmentUrl!
-        : "${Constants.baseUrl}${message.attachmentUrl}";
+        : '${Constants.baseUrl}${message.attachmentUrl}';
+    resolvedUrl = Uri.parse(resolvedUrl).toString();
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
@@ -228,7 +231,16 @@ class MessageItem extends StatelessWidget {
     return GestureDetector(
       onTap: () async {
         try {
-          await OpenFile.open(message.attachmentUrl!);
+          final String url = message.attachmentUrl!.startsWith('http')
+              ? message.attachmentUrl!
+              : '${Constants.baseUrl}${message.attachmentUrl}';
+          final encoded = Uri.parse(url).toString();
+          // Download to temp then open
+          // ignore: use_build_context_synchronously
+          final tempDir = await getTemporaryDirectory();
+          final savePath = '${tempDir.path}/${message.attachmentName ?? 'file'}';
+          await Dio().download(encoded, savePath);
+          await OpenFile.open(savePath);
         } catch (e) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Cannot open file: $e')),

@@ -218,6 +218,7 @@ void handleFileGet() {
   if (!SPIFFS.exists(path)) { server.send(404, "text/plain", "Not found"); return; }
   File f = SPIFFS.open(path, FILE_READ);
   String ct = detectContentType(path);
+  server.sendHeader("Access-Control-Allow-Origin", "*");
   server.streamFile(f, ct);
   f.close();
 }
