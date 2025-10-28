@@ -156,6 +156,47 @@ class MessageItem extends StatelessWidget {
     );
   }
 
+  String _resolvedUrl() {
+    if (!message.hasAttachment) return '';
+    final raw = message.attachmentUrl!;
+    final full = raw.startsWith('http') ? raw : '${Constants.baseUrl}$raw';
+    return Uri.parse(full).toString();
+  }
+
+  Future<void> _downloadAttachment(BuildContext context) async {
+    try {
+      final url = _resolvedUrl();
+      if (url.isEmpty) throw Exception('Missing URL');
+      final dir = await getApplicationDocumentsDirectory();
+      final filename = message.attachmentName ?? 'file';
+      final savePath = '${dir.path}/$filename';
+      await Dio().download(url, savePath);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Saved to $savePath')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Download failed: $e')),
+      );
+    }
+  }
+
+  Future<void> _openDocument(BuildContext context) async {
+    try {
+      final url = _resolvedUrl();
+      final tempDir = await getTemporaryDirectory();
+      final savePath = '${tempDir.path}/${message.attachmentName ?? 'file'}';
+      await Dio().download(url, savePath);
+      await OpenFile.open(savePath);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cannot open file: $e')),
+      );
+    }
+  }
+
   Widget _buildAttachment(BuildContext context) {
     if (message.isImage) {
       return _buildImageAttachment(context);
@@ -165,129 +206,165 @@ class MessageItem extends StatelessWidget {
   }
 
   Widget _buildImageAttachment(BuildContext context) {
-    String resolvedUrl = message.attachmentUrl!.startsWith('http')
-        ? message.attachmentUrl!
-        : '${Constants.baseUrl}${message.attachmentUrl}';
-    resolvedUrl = Uri.parse(resolvedUrl).toString();
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => ImageViewerScreen(
-              imageUrl: resolvedUrl,
-              imageName: message.attachmentName,
+    final resolvedUrl = _resolvedUrl();
+    return Stack(
+      children: [
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => ImageViewerScreen(
+                  imageUrl: resolvedUrl,
+                  imageName: message.attachmentName,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            constraints: const BoxConstraints(
+              maxWidth: 200,
+              maxHeight: 200,
+            ),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                resolvedUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    height: 100,
+                    color: Colors.grey.shade200,
+                    child: const Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 160,
+                    color: Colors.grey.shade200,
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.broken_image),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Failed to load image',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            TextButton.icon(
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => ImageViewerScreen(
+                                      imageUrl: resolvedUrl,
+                                      imageName: message.attachmentName,
+                                    ),
+                                  ),
+                                );
+                              },
+                              icon: const Icon(Icons.open_in_full),
+                              label: const Text('Open'),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              onPressed: () => _downloadAttachment(context),
+                              icon: const Icon(Icons.download),
+                              label: const Text('Download'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        );
-      },
-      child: Container(
-        constraints: const BoxConstraints(
-          maxWidth: 200,
-          maxHeight: 200,
         ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: Image.network(
-            resolvedUrl,
-            fit: BoxFit.cover,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Container(
-                height: 100,
-                color: Colors.grey.shade200,
-                child: const Center(
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                height: 100,
-                color: Colors.grey.shade200,
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.broken_image),
-                    SizedBox(height: 4),
-                    Text(
-                      'Failed to load',
-                      style: TextStyle(fontSize: 10),
-                    ),
-                  ],
-                ),
-              );
-            },
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Material(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () => _downloadAttachment(context),
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(Icons.download, color: Colors.white, size: 18),
+              ),
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildDocumentAttachment(BuildContext context) {
-    return GestureDetector(
-      onTap: () async {
-        try {
-          final String url = message.attachmentUrl!.startsWith('http')
-              ? message.attachmentUrl!
-              : '${Constants.baseUrl}${message.attachmentUrl}';
-          final encoded = Uri.parse(url).toString();
-          // Download to temp then open
-          // ignore: use_build_context_synchronously
-          final tempDir = await getTemporaryDirectory();
-          final savePath =
-              '${tempDir.path}/${message.attachmentName ?? 'file'}';
-          await Dio().download(encoded, savePath);
-          await OpenFile.open(savePath);
-        } catch (e) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Cannot open file: $e')),
-          );
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              _getDocumentIcon(),
-              color: Colors.grey.shade600,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.attachmentName ?? 'Unknown file',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            _getDocumentIcon(),
+            color: Colors.grey.shade600,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.attachmentName ?? 'Unknown file',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
-                  Text(
-                    'Tap to open',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontSize: 10,
-                    ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'Open or download',
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 10,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Open',
+            icon: const Icon(Icons.open_in_new),
+            color: Colors.blueGrey,
+            onPressed: () => _openDocument(context),
+          ),
+          IconButton(
+            tooltip: 'Download',
+            icon: const Icon(Icons.download),
+            color: Colors.blueGrey,
+            onPressed: () => _downloadAttachment(context),
+          ),
+        ],
       ),
     );
   }
@@ -302,7 +379,15 @@ class MessageItem extends StatelessWidget {
       case 'doc':
       case 'docx':
         return Icons.description;
+      case 'ppt':
+      case 'pptx':
+        return Icons.slideshow;
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return Icons.table_chart;
       case 'txt':
+      case 'rtf':
         return Icons.text_snippet;
       case 'zip':
       case 'rar':
