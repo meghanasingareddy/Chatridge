@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/chat_screen.dart';
+import 'screens/connect_screen.dart';
 import 'providers/connectivity_provider.dart';
 import 'services/storage_service.dart';
 
@@ -38,6 +39,9 @@ class _AppState extends State<App> {
   Widget build(BuildContext context) {
     return Consumer<ConnectivityProvider>(
       builder: (context, connectivityProvider, child) {
+        if (!connectivityProvider.isConnectedToChatridge) {
+          return const ConnectScreen();
+        }
         return Scaffold(
           body: SafeArea(
             child: Padding(

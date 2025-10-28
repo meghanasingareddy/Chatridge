@@ -4,7 +4,6 @@ part 'device.g.dart';
 
 @HiveType(typeId: 1)
 class Device extends HiveObject {
-
   Device({
     required this.name,
     required this.ip,
@@ -13,12 +12,28 @@ class Device extends HiveObject {
   });
 
   factory Device.fromJson(Map<String, dynamic> json) {
+    DateTime lastSeen;
+    final raw = json['last_seen'];
+    if (raw == null) {
+      lastSeen = DateTime.now();
+    } else if (raw is int) {
+      lastSeen = DateTime.fromMillisecondsSinceEpoch(raw);
+    } else if (raw is double) {
+      lastSeen = DateTime.fromMillisecondsSinceEpoch(raw.toInt());
+    } else if (raw is String) {
+      try {
+        lastSeen = DateTime.parse(raw);
+      } catch (_) {
+        lastSeen = DateTime.fromMillisecondsSinceEpoch(int.tryParse(raw) ?? 0);
+      }
+    } else {
+      lastSeen = DateTime.now();
+    }
+
     return Device(
       name: json['name'] ?? '',
       ip: json['ip'] ?? '',
-      lastSeen: json['last_seen'] != null
-          ? DateTime.parse(json['last_seen'])
-          : DateTime.now(),
+      lastSeen: lastSeen,
       isOnline: json['online'] ?? true,
     );
   }

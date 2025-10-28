@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
+import '../providers/connectivity_provider.dart';
 import '../services/file_service.dart';
 import '../services/storage_service.dart';
 import '../utils/helpers.dart';
@@ -225,6 +226,8 @@ class _InputAreaState extends State<InputArea> {
 
   @override
   Widget build(BuildContext context) {
+    final isConnected =
+        context.watch<ConnectivityProvider>().isConnectedToChatridge;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -282,7 +285,7 @@ class _InputAreaState extends State<InputArea> {
               // Attachment button
               IconButton(
                 icon: const Icon(Icons.attach_file),
-                onPressed: _isSending ? null : _showFileOptions,
+                onPressed: _isSending || !isConnected ? null : _showFileOptions,
                 color: Colors.grey.shade600,
               ),
 
@@ -302,7 +305,7 @@ class _InputAreaState extends State<InputArea> {
                   ),
                   maxLines: null,
                   textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendMessage(),
+                  onSubmitted: (_) => isConnected ? _sendMessage() : null,
                 ),
               ),
 
@@ -311,7 +314,9 @@ class _InputAreaState extends State<InputArea> {
               // Send button
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: _isSending ? Colors.grey : const Color(0xFF3498DB),
+                  color: _isSending || !isConnected
+                      ? Colors.grey
+                      : const Color(0xFF3498DB),
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
@@ -326,7 +331,7 @@ class _InputAreaState extends State<InputArea> {
                           ),
                         )
                       : const Icon(Icons.send, color: Colors.white),
-                  onPressed: _isSending ? null : _sendMessage,
+                  onPressed: _isSending || !isConnected ? null : _sendMessage,
                 ),
               ),
             ],

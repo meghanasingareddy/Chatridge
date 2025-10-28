@@ -4,7 +4,6 @@ part 'message.g.dart';
 
 @HiveType(typeId: 0)
 class Message extends HiveObject {
-
   Message({
     required this.id,
     required this.username,
@@ -18,14 +17,31 @@ class Message extends HiveObject {
   });
 
   factory Message.fromJson(Map<String, dynamic> json) {
+    DateTime ts;
+    final rawTs = json['timestamp'];
+    if (rawTs == null) {
+      ts = DateTime.now();
+    } else if (rawTs is int) {
+      ts = DateTime.fromMillisecondsSinceEpoch(rawTs);
+    } else if (rawTs is double) {
+      ts = DateTime.fromMillisecondsSinceEpoch(rawTs.toInt());
+    } else if (rawTs is String) {
+      // Try ISO8601, fallback to epoch millis string
+      try {
+        ts = DateTime.parse(rawTs);
+      } catch (_) {
+        ts = DateTime.fromMillisecondsSinceEpoch(int.tryParse(rawTs) ?? 0);
+      }
+    } else {
+      ts = DateTime.now();
+    }
+
     return Message(
       id: json['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
       username: json['username'] ?? '',
       text: json['text'] ?? '',
       target: json['target'],
-      timestamp: json['timestamp'] != null
-          ? DateTime.parse(json['timestamp'])
-          : DateTime.now(),
+      timestamp: ts,
       attachmentUrl: json['attachment_url'],
       attachmentName: json['attachment_name'],
       attachmentType: json['attachment_type'],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/device_provider.dart';
+import '../providers/connectivity_provider.dart';
 import '../models/device.dart';
 
 class DeviceList extends StatelessWidget {
@@ -10,8 +11,16 @@ class DeviceList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isConnected =
+        context.watch<ConnectivityProvider>().isConnectedToChatridge;
     return Consumer<DeviceProvider>(
       builder: (context, deviceProvider, child) {
+        if (!isConnected) {
+          return const Center(
+            child: Text('Connect to Chatridge to see devices',
+                style: TextStyle(color: Colors.grey)),
+          );
+        }
         final devices = deviceProvider.devices;
 
         if (devices.isEmpty) {
