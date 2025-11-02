@@ -70,6 +70,18 @@ class ChatProvider extends ChangeNotifier {
       final serverMessages = await _apiService.getMessages();
 
       // Update local messages with server data
+      // Remove local messages that might have been replaced by server messages
+      final serverIds = serverMessages.map((m) => m.id).toSet();
+      _messages.removeWhere((msg) => 
+        msg.isLocal && 
+        serverMessages.any((sm) => 
+          sm.username == msg.username &&
+          sm.text == msg.text &&
+          sm.target == msg.target &&
+          sm.timestamp.difference(msg.timestamp).inSeconds.abs() < 10
+        )
+      );
+
       for (final serverMessage in serverMessages) {
         final existingIndex = _messages.indexWhere(
           (msg) => msg.id == serverMessage.id,
@@ -135,9 +147,12 @@ class ChatProvider extends ChangeNotifier {
       );
 
       if (success) {
-        // Update message as sent
-        localMessage.isLocal = false;
-        await StorageService.saveMessage(localMessage);
+        // Remove local message - it will be replaced by server message on next fetch
+        // This prevents duplicates
+        _messages.removeWhere((msg) => msg.id == localMessage!.id);
+        await StorageService.deleteMessage(localMessage.id);
+        // Immediately fetch to get server message with proper ID
+        await fetchMessages();
       } else {
         // Remove failed message
         _messages.removeWhere((msg) => msg.id == localMessage!.id);
@@ -200,13 +215,24 @@ class ChatProvider extends ChangeNotifier {
           target: target,
           timestamp: DateTime.now(),
           attachmentUrl: attachmentUrl,
-          attachmentName: filePath.split('/').last,
+          attachmentName: filePath.split(Platform.pathSeparator).last,
           attachmentType: _getFileType(filePath),
         );
 
+        // Remove any local message with same content to prevent duplicates
+        _messages.removeWhere((msg) => 
+          msg.username == username &&
+          msg.text == 'Shared a file' &&
+          msg.target == target &&
+          msg.timestamp.difference(DateTime.now()).inSeconds.abs() < 5
+        );
+        
         _messages.add(message);
         await StorageService.saveMessage(message);
         debugPrint('ChatProvider: File message created and saved');
+        
+        // Immediately fetch to get server message with proper ID
+        await fetchMessages();
       } else {
         debugPrint('ChatProvider: File upload failed - no URL returned');
       }

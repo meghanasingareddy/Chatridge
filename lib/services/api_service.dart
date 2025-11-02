@@ -160,10 +160,13 @@ class ApiService {
             'File too large: ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB (max: ${Constants.maxFileSizeMB}MB)',);
       }
 
+      // Handle Windows paths (backslashes) and Unix paths (forward slashes)
+      final filename = file.path.split(Platform.pathSeparator).last;
+      
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(
           file.path,
-          filename: file.path.split('/').last,
+          filename: filename,
         ),
         'username': username,
         if (target != null && target.isNotEmpty) 'target': target,

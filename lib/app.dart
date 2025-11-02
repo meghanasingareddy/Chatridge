@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
 import 'screens/chat_screen.dart';
 import 'screens/connect_screen.dart';
+import 'screens/conversations_screen.dart';
 import 'providers/connectivity_provider.dart';
 import 'services/storage_service.dart';
 
@@ -26,10 +27,10 @@ class _AppState extends State<App> {
     final deviceName = StorageService.getDeviceName();
 
     if (username != null && deviceName != null) {
-      // User is registered, go to chat screen
+      // User is registered, go to conversations screen
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const ChatScreen()),
+          MaterialPageRoute(builder: (context) => const ConversationsScreen()),
         );
       }
     }

@@ -59,6 +59,11 @@ class ChatridgeApp extends StatelessWidget {
       child: MaterialApp(
         title: 'Chatridge',
         theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF3498DB),
+            brightness: Brightness.light,
+          ),
           primarySwatch: Colors.blue,
           primaryColor: const Color(0xFF3498DB),
           scaffoldBackgroundColor: const Color(0xFFF8F9FA),
@@ -86,6 +91,31 @@ class ChatridgeApp extends StatelessWidget {
             ),
           ),
         ),
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF3498DB),
+            brightness: Brightness.dark,
+          ),
+          primaryColor: const Color(0xFF3498DB),
+          scaffoldBackgroundColor: const Color(0xFF121212),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF1E1E1E),
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+          cardColor: const Color(0xFF1E1E1E),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF3498DB),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+        themeMode: ThemeMode.system, // Auto dark mode based on system
         home: const App(),
         debugShowCheckedModeBanner: false,
       ),

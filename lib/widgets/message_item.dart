@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:open_file/open_file.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/message.dart';
 import '../utils/helpers.dart';
 import '../screens/image_viewer_screen.dart';
@@ -183,6 +184,32 @@ class MessageItem extends StatelessWidget {
     }
   }
 
+  Future<void> _shareAttachment(BuildContext context) async {
+    try {
+      final url = _resolvedUrl();
+      if (url.isEmpty) throw Exception('Missing URL');
+      final tempDir = await getTemporaryDirectory();
+      final filename = message.attachmentName ?? 'file';
+      final savePath = '${tempDir.path}/$filename';
+      
+      // Download file first
+      await Dio().download(url, savePath);
+      
+      if (!context.mounted) return;
+      
+      // Share the file
+      await Share.shareXFiles(
+        [XFile(savePath)],
+        text: message.attachmentName ?? 'Shared file',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Share failed: $e')),
+      );
+    }
+  }
+
   Future<void> _openDocument(BuildContext context) async {
     try {
       final url = _resolvedUrl();
@@ -278,6 +305,12 @@ class MessageItem extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             TextButton.icon(
+                              onPressed: () => _shareAttachment(context),
+                              icon: const Icon(Icons.share),
+                              label: const Text('Share'),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
                               onPressed: () => _downloadAttachment(context),
                               icon: const Icon(Icons.download),
                               label: const Text('Download'),
@@ -292,20 +325,39 @@ class MessageItem extends StatelessWidget {
             ),
           ),
         ),
+        // Action buttons overlay
         Positioned(
           top: 6,
           right: 6,
-          child: Material(
-            color: Colors.black54,
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20),
-              onTap: () => _downloadAttachment(context),
-              child: const Padding(
-                padding: EdgeInsets.all(6),
-                child: Icon(Icons.download, color: Colors.white, size: 18),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => _shareAttachment(context),
+                  child: const Padding(
+                    padding: EdgeInsets.all(6),
+                    child: Icon(Icons.share, color: Colors.white, size: 18),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 4),
+              Material(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => _downloadAttachment(context),
+                  child: const Padding(
+                    padding: EdgeInsets.all(6),
+                    child: Icon(Icons.download, color: Colors.white, size: 18),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],

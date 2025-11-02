@@ -6,9 +6,12 @@ import '../widgets/message_item.dart';
 import '../widgets/device_list.dart';
 import '../widgets/input_area.dart';
 import 'settings_screen.dart';
+import 'conversations_screen.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? initialTarget;
+  
+  const ChatScreen({super.key, this.initialTarget});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -22,6 +25,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTarget = widget.initialTarget;
     _scrollToBottom();
   }
 
@@ -76,6 +80,30 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          // Refresh Button
+          Consumer<ChatProvider>(
+            builder: (context, chatProvider, child) {
+              return IconButton(
+                icon: chatProvider.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.refresh),
+                onPressed: chatProvider.isLoading
+                    ? null
+                    : () async {
+                        await chatProvider.fetchMessages();
+                        await context.read<DeviceProvider>().fetchDevices();
+                      },
+                tooltip: 'Refresh messages',
+              );
+            },
+          ),
           // Device List Toggle
           IconButton(
             icon: const Icon(Icons.people),
@@ -84,6 +112,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _showDevices = !_showDevices;
               });
             },
+            tooltip: 'Show devices',
           ),
           // Settings
           IconButton(
@@ -95,8 +124,15 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               );
             },
+            tooltip: 'Settings',
           ),
         ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pop();
+          },
+        ),
       ),
       body: Column(
         children: [

@@ -1,53 +1,47 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:wifi_iot/wifi_iot.dart';
+import 'package:flutter/services.dart';
 import '../utils/constants.dart';
+
+// Conditional import for wifi_iot (only available on mobile)
+import 'wifi_service_stub.dart'
+    if (dart.library.io) 'wifi_service_mobile.dart' as wifi_impl;
 
 class WifiService {
   factory WifiService() => _instance;
   WifiService._internal();
   static final WifiService _instance = WifiService._internal();
 
+  bool get _isDesktop {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.windows ||
+           defaultTargetPlatform == TargetPlatform.linux ||
+           defaultTargetPlatform == TargetPlatform.macOS;
+  }
+
   Future<bool> ensureConnectedToEsp() async {
+    // Web cannot manage Wi‑Fi; assume manual connection
     if (kIsWeb) {
-      return true; // Web cannot manage Wi‑Fi; assume manual connection
+      return true;
     }
 
+    // Desktop platforms: assume manual connection (user connects via OS WiFi settings)
+    if (_isDesktop) {
+      debugPrint('Desktop platform: Please connect to ${Constants.esp32SSID} manually via your OS WiFi settings');
+      return true; // Assume connected, let API calls determine actual connection
+    }
+
+    // Mobile platforms: try to connect automatically using wifi_iot
+    // wifi_iot may not be available on all platforms, so we catch MissingPluginException
     try {
-      final isEnabled = await WiFiForIoTPlugin.isEnabled();
-      if (isEnabled == false) {
-        await WiFiForIoTPlugin.setEnabled(true);
-      }
-
-      final currentSSID = await WiFiForIoTPlugin.getSSID();
-      if (currentSSID == Constants.esp32SSID) {
-        return true;
-      }
-
-      final didConnect = await WiFiForIoTPlugin.connect(
-        Constants.esp32SSID,
-        password: Constants.esp32Password,
-        security: NetworkSecurity.WPA,
-        joinOnce: true,
-        withInternet: false,
-        isHidden: false,
-      );
-
-      if (!didConnect) return false;
-
-      // Wait until associated
-      for (int i = 0; i < 15; i++) {
-        await Future.delayed(const Duration(seconds: 1));
-        final ssid = await WiFiForIoTPlugin.getSSID();
-        if (ssid == Constants.esp32SSID) return true;
-      }
-
-      return false;
+      return await wifi_impl.connectUsingWifiIotMobile();
+    } on MissingPluginException catch (e) {
+      debugPrint('WiFi plugin not available on this platform: $e');
+      debugPrint('Please connect to ${Constants.esp32SSID} manually');
+      return true; // Assume manual connection
     } catch (e) {
       debugPrint('WiFi connect error: $e');
-      return false;
+      return true; // Assume manual connection needed
     }
   }
 }
-
