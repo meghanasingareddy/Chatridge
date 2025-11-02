@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatridge - Web Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            padding: 15px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .status-dot.offline {
+            background: #dc3545;
+            animation: none;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .input-section {
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #495057;
+            font-size: 14px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"], textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.3s;
+        }
+
+        input[type="text"]:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: background 0.3s;
+            flex: 1;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .file-upload {
+            margin-top: 15px;
+        }
+
+        .file-upload input[type="file"] {
+            display: none;
+        }
+
+        .file-upload-label {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #95a5a6;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .file-upload-label:hover {
+            background: #7f8c8d;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .messages-section {
+            margin-top: 30px;
+        }
+
+        .messages-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .messages-header h2 {
+            font-size: 20px;
+            color: #2c3e50;
+        }
+
+        .refresh-btn {
+            background: #27ae60;
+            padding: 8px 16px;
+            font-size: 12px;
+        }
+
+        .refresh-btn:hover {
+            background: #229954;
+        }
+
+        .messages-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .message-username {
+            font-weight: 600;
+            color: #3498db;
+            font-size: 14px;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .message-text {
+            color: #2c3e50;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-bottom: 8px;
+            word-wrap: break-word;
+        }
+
+        .message-text a {
+            color: #3498db;
+            text-decoration: underline;
+        }
+
+        .message-attachment {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .message-attachment a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        .message-attachment a:hover {
+            text-decoration: underline;
+        }
+
+        .devices-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #e9ecef;
+        }
+
+        .devices-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .device-chip {
+            background: #e9ecef;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .device-chip.online {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .device-chip .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #6c757d;
+        }
+
+        .device-chip.online .dot {
+            background: #28a745;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        @media (max-width: 600px) {
+            .input-row {
+                flex-direction: column;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .status-bar {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💬 Chatridge</h1>
+            <p>Offline Local WiFi Messaging</p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">Connecting...</span>
+            </div>
+            <div style="font-size: 12px; color: #6c757d;">
+                <span id="deviceCount">0</span> devices online
+            </div>
+        </div>
+
+        <div class="content">
+            <div id="errorContainer"></div>
+
+            <div class="input-section">
+                <div class="input-group">
+                    <label>Your Username</label>
+                    <input type="text" id="username" placeholder="Enter your name" required>
+                </div>
+
+                <div class="input-group">
+                    <label>Target (Optional - Leave empty for group chat)</label>
+                    <select id="target">
+                        <option value="">Group Chat (Everyone)</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label>Message</label>
+                    <textarea id="messageText" placeholder="Type your message here..."></textarea>
+                </div>
+
+                <div class="input-row">
+                    <button id="sendBtn" onclick="sendMessage()">Send Message</button>
+                    <button class="refresh-btn" onclick="refreshAll()">Refresh</button>
+                </div>
+
+                <div class="file-upload">
+                    <label class="file-upload-label" for="fileInput">📎 Attach File</label>
+                    <input type="file" id="fileInput" onchange="handleFileSelect(event)">
+                    <div class="file-name" id="fileName"></div>
+                </div>
+            </div>
+
+            <div class="messages-section">
+                <div class="messages-header">
+                    <h2>Messages</h2>
+                    <button class="refresh-btn" onclick="loadMessages()">Refresh</button>
+                </div>
+                <div class="messages-container" id="messagesContainer">
+                    <div class="loading">Loading messages...</div>
+                </div>
+            </div>
+
+            <div class="devices-section">
+                <h2>Connected Devices</h2>
+                <div class="devices-list" id="devicesList">
+                    <div class="loading">Loading devices...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const BASE_URL = 'http://192.168.4.1';
+        let currentUsername = '';
+        let selectedFile = null;
+        let refreshInterval = null;
+
+        // Initialize
+        window.onload = function() {
+            loadMessages();
+            loadDevices();
+            startAutoRefresh();
+            updateStatus(true);
+        };
+
+        function updateStatus(connected) {
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            if (connected) {
+                dot.classList.remove('offline');
+                text.textContent = 'Connected';
+            } else {
+                dot.classList.add('offline');
+                text.textContent = 'Disconnected';
+            }
+        }
+
+        function showError(message) {
+            const container = document.getElementById('errorContainer');
+            container.innerHTML = `<div class="error">${message}</div>`;
+            setTimeout(() => {
+                container.innerHTML = '';
+            }, 5000);
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return 'Just now';
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diff = now - date;
+            const seconds = Math.floor(diff / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const hours = Math.floor(minutes / 60);
+            
+            if (seconds < 60) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            return date.toLocaleDateString();
+        }
+
+        function makeLinksClickable(text) {
+            const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)/gi;
+            return text.replace(urlRegex, (url) => {
+                let href = url;
+                if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                    href = 'https://' + url;
+                }
+                return `<a href="${href}" target="_blank">${url}</a>`;
+            });
+        }
+
+        async function loadMessages() {
+            try {
+                const response = await fetch(`${BASE_URL}/messages`);
+                if (!response.ok) throw new Error('Failed to load messages');
+                const messages = await response.json();
+                
+                displayMessages(messages);
+                updateStatus(true);
+            } catch (error) {
+                console.error('Error loading messages:', error);
+                updateStatus(false);
+                document.getElementById('messagesContainer').innerHTML = 
+                    '<div class="error">Failed to load messages. Please check your connection.</div>';
+            }
+        }
+
+        function displayMessages(messages) {
+            const container = document.getElementById('messagesContainer');
+            
+            if (messages.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">💬</div>
+                        <p>No messages yet. Start the conversation!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort by timestamp
+            messages.sort((a, b) => a.timestamp - b.timestamp);
+
+            container.innerHTML = messages.map(msg => {
+                const time = formatTime(msg.timestamp);
+                const text = makeLinksClickable(msg.text || '');
+                const isPrivate = msg.target ? `<span style="color: #e74c3c;">🔒 Private</span>` : '';
+                const attachment = msg.attachment_url ? `
+                    <div class="message-attachment">
+                        📎 <a href="${BASE_URL}${msg.attachment_url}" target="_blank">${msg.attachment_name || 'File'}</a>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="message">
+                        <div class="message-header">
+                            <span class="message-username">${msg.username || 'Unknown'}</span>
+                            <span class="message-time">${time} ${isPrivate}</span>
+                        </div>
+                        <div class="message-text">${text}</div>
+                        ${attachment}
+                    </div>
+                `;
+            }).join('');
+
+            // Scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function loadDevices() {
+            try {
+                const response = await fetch(`${BASE_URL}/devices`);
+                if (!response.ok) throw new Error('Failed to load devices');
+                const devices = await response.json();
+                
+                displayDevices(devices);
+                
+                // Update target dropdown
+                updateTargetDropdown(devices);
+                
+                document.getElementById('deviceCount').textContent = devices.filter(d => d.online).length;
+            } catch (error) {
+                console.error('Error loading devices:', error);
+                document.getElementById('devicesList').innerHTML = 
+                    '<div class="error">Failed to load devices</div>';
+            }
+        }
+
+        function displayDevices(devices) {
+            const container = document.getElementById('devicesList');
+            
+            if (devices.length === 0) {
+                container.innerHTML = '<div class="empty-state">No devices found</div>';
+                return;
+            }
+
+            container.innerHTML = devices.map(device => `
+                <div class="device-chip ${device.online ? 'online' : ''}">
+                    <div class="dot"></div>
+                    <span>${device.name}</span>
+                </div>
+            `).join('');
+        }
+
+        function updateTargetDropdown(devices) {
+            const select = document.getElementById('target');
+            const currentValue = select.value;
+            
+            // Keep "Group Chat" option and clear others
+            select.innerHTML = '<option value="">Group Chat (Everyone)</option>';
+            
+            devices.forEach(device => {
+                if (device.name && device.name.trim() !== '') {
+                    const option = document.createElement('option');
+                    option.value = device.name;
+                    option.textContent = device.name + (device.online ? ' 🟢' : '');
+                    select.appendChild(option);
+                }
+            });
+            
+            // Restore selection if still valid
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        }
+
+        async function sendMessage() {
+            const username = document.getElementById('username').value.trim();
+            const text = document.getElementById('messageText').value.trim();
+            const target = document.getElementById('target').value.trim();
+
+            if (!username) {
+                showError('Please enter your username');
+                return;
+            }
+
+            if (!text && !selectedFile) {
+                showError('Please enter a message or select a file');
+                return;
+            }
+
+            currentUsername = username;
+
+            try {
+                // Register device first
+                await fetch(`${BASE_URL}/register?name=${encodeURIComponent(username)}`);
+
+                if (selectedFile) {
+                    await sendFile(username, target);
+                } else {
+                    await sendTextMessage(username, text, target);
+                }
+
+                // Clear input
+                document.getElementById('messageText').value = '';
+                document.getElementById('fileInput').value = '';
+                document.getElementById('fileName').textContent = '';
+                selectedFile = null;
+
+                // Reload messages
+                setTimeout(() => {
+                    loadMessages();
+                    loadDevices();
+                }, 500);
+            } catch (error) {
+                console.error('Error sending message:', error);
+                showError('Failed to send message: ' + error.message);
+            }
+        }
+
+        async function sendTextMessage(username, text, target) {
+            let url = `${BASE_URL}/send?username=${encodeURIComponent(username)}&text=${encodeURIComponent(text)}`;
+            if (target) {
+                url += `&target=${encodeURIComponent(target)}`;
+            }
+
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Failed to send message');
+        }
+
+        async function sendFile(username, target) {
+            if (!selectedFile) return;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('username', username);
+            if (target) {
+                formData.append('target', target);
+            }
+
+            const response = await fetch(`${BASE_URL}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) throw new Error('Failed to upload file');
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                selectedFile = file;
+                document.getElementById('fileName').textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+            }
+        }
+
+        function refreshAll() {
+            loadMessages();
+            loadDevices();
+        }
+
+        function startAutoRefresh() {
+            // Refresh every 3 seconds
+            refreshInterval = setInterval(() => {
+                loadMessages();
+                loadDevices();
+            }, 3000);
+        }
+
+        // Cleanup on page unload
+        window.onbeforeunload = function() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        };
+    </script>
+</body>
+</html>
+
+

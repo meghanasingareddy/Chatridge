@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/device_provider.dart';
+import '../providers/connectivity_provider.dart';
 import '../services/storage_service.dart';
 import '../utils/helpers.dart';
 import 'chat_screen.dart';
@@ -16,6 +17,34 @@ class ConversationsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Conversations'),
         actions: [
+          // WiFi Test Connection Button
+          Consumer<ConnectivityProvider>(
+            builder: (context, connectivityProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.wifi_find),
+                onPressed: () async {
+                  await connectivityProvider.refreshConnectivity();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          connectivityProvider.isConnectedToChatridge
+                              ? 'Successfully connected to Chatridge!'
+                              : 'Could not connect to Chatridge server. Please check your WiFi connection.',
+                        ),
+                        backgroundColor:
+                            connectivityProvider.isConnectedToChatridge
+                                ? Colors.green
+                                : Colors.orange,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                },
+                tooltip: 'Test WiFi Connection',
+              );
+            },
+          ),
           // Refresh Button
           Consumer2<ChatProvider, DeviceProvider>(
             builder: (context, chatProvider, deviceProvider, child) {

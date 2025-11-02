@@ -1,13 +1,17 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
 import 'package:open_file/open_file.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/message.dart';
 import '../utils/helpers.dart';
 import '../screens/image_viewer_screen.dart';
 import '../utils/constants.dart';
+import '../services/storage_service.dart';
 
 class MessageItem extends StatelessWidget {
   const MessageItem({
@@ -20,8 +24,11 @@ class MessageItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMe =
-        message.username == 'You'; // This should be compared with current user
+    final myUsername = StorageService.getUsername();
+    final myDeviceName = StorageService.getDeviceName();
+    final isMe = message.username == myUsername || 
+                 message.username == myDeviceName ||
+                 (myUsername == null && message.username == 'You');
     final hasAttachment = message.hasAttachment;
 
     return Container(
@@ -82,15 +89,9 @@ class MessageItem extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Message text
+                      // Message text with URL detection
                       if (message.text.isNotEmpty) ...[
-                        Text(
-                          message.text,
-                          style: TextStyle(
-                            color: isMe ? Colors.white : Colors.black87,
-                            fontSize: 14,
-                          ),
-                        ),
+                        _buildMessageText(context, message.text, isMe),
                         if (hasAttachment) const SizedBox(height: 8),
                       ],
 
@@ -177,6 +178,8 @@ class MessageItem extends StatelessWidget {
       final filePath = _resolvedUrl();
       if (filePath.isEmpty) throw Exception('Missing file path');
       
+      debugPrint('Downloading attachment: original URL=${message.attachmentUrl}, resolved=$filePath');
+      
       // Create properly configured Dio instance with baseUrl
       final dio = Dio(BaseOptions(
         baseUrl: Constants.baseUrl,
@@ -190,24 +193,73 @@ class MessageItem extends StatelessWidget {
       ));
       
       final dir = await getApplicationDocumentsDirectory();
-      final filename = message.attachmentName ?? 'file';
+      
+      // Use attachment name, fallback to filename from URL
+      String filename = message.attachmentName ?? 'file';
+      if (filename.isEmpty) {
+        final pathParts = filePath.split('/');
+        filename = pathParts.isNotEmpty ? pathParts.last : 'file';
+      }
+      
+      // Ensure filename is safe for filesystem
+      filename = filename.replaceAll(RegExp(r'[<>:"|?*]'), '_');
+      
       final savePath = '${dir.path}/$filename';
       
-      // Ensure path starts with /
+      // Normalize path - ensure it starts with / and doesn't have double slashes
       String path = filePath.startsWith('/') ? filePath : '/$filePath';
-      debugPrint('Downloading file: ${Constants.baseUrl}$path');
+      path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
       
-      await dio.download(path, savePath);
+      // URL encode the path to handle special characters (spaces, etc.)
+      // Split path into parts and encode each part separately
+      final pathParts = path.split('/');
+      final encodedParts = pathParts.map((part) {
+        if (part.isEmpty) return part;
+        return Uri.encodeComponent(part);
+      }).toList();
+      final encodedPath = encodedParts.join('/');
+      
+      debugPrint('Downloading file: ${Constants.baseUrl}$encodedPath -> $savePath');
+      debugPrint('Original path: $path, Encoded path: $encodedPath');
+      
+      try {
+        await dio.download(encodedPath, savePath);
+        debugPrint('File downloaded successfully: $savePath');
+      } on DioException catch (e) {
+        debugPrint('Download error: ${e.message}');
+        debugPrint('Response: ${e.response?.data}');
+        debugPrint('Status code: ${e.response?.statusCode}');
+        
+        if (e.response?.statusCode == 404) {
+          throw Exception('File not found on server. Path: $path');
+        } else if (e.response?.statusCode == 500) {
+          throw Exception('Server error while downloading file');
+        } else {
+          throw Exception('Failed to download file: ${e.message}');
+        }
+      }
+      
+      // Verify file was downloaded
+      final downloadedFile = File(savePath);
+      if (!await downloadedFile.exists()) {
+        throw Exception('Downloaded file not found');
+      }
       
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Saved to $savePath')),
+        SnackBar(
+          content: Text('Saved to $savePath'),
+          duration: const Duration(seconds: 3),
+        ),
       );
     } catch (e) {
       debugPrint('Download error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: ${e.toString()}')),
+        SnackBar(
+          content: Text('Download failed: ${e.toString()}'),
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
@@ -235,8 +287,19 @@ class MessageItem extends StatelessWidget {
       
       // Ensure path starts with /
       String path = filePath.startsWith('/') ? filePath : '/$filePath';
-      debugPrint('Downloading file for share: ${Constants.baseUrl}$path');
-      await dio.download(path, savePath);
+      path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
+      
+      // URL encode the path to handle special characters
+      final pathParts = path.split('/');
+      final encodedParts = pathParts.map((part) {
+        if (part.isEmpty) return part;
+        return Uri.encodeComponent(part);
+      }).toList();
+      final encodedPath = encodedParts.join('/');
+      
+      debugPrint('Downloading file for share: ${Constants.baseUrl}$encodedPath');
+      debugPrint('Original path: $path, Encoded path: $encodedPath');
+      await dio.download(encodedPath, savePath);
       
       if (!context.mounted) return;
       
@@ -259,6 +322,8 @@ class MessageItem extends StatelessWidget {
       final filePath = _resolvedUrl();
       if (filePath.isEmpty) throw Exception('Missing file path');
       
+      debugPrint('Opening document: original URL=${message.attachmentUrl}, resolved=$filePath');
+      
       // Create properly configured Dio instance with baseUrl
       final dio = Dio(BaseOptions(
         baseUrl: Constants.baseUrl,
@@ -272,12 +337,66 @@ class MessageItem extends StatelessWidget {
       ));
       
       final tempDir = await getTemporaryDirectory();
-      final savePath = '${tempDir.path}/${message.attachmentName ?? 'file'}';
       
-      // Ensure path starts with /
+      // Use attachment name, fallback to filename from URL
+      String fileName = message.attachmentName ?? 'file';
+      if (fileName.isEmpty) {
+        // Extract filename from URL path
+        final pathParts = filePath.split('/');
+        fileName = pathParts.isNotEmpty ? pathParts.last : 'file';
+      }
+      
+      // Ensure filename is safe for filesystem
+      fileName = fileName.replaceAll(RegExp(r'[<>:"|?*]'), '_');
+      
+      final savePath = '${tempDir.path}/$fileName';
+      
+      // Normalize path - ensure it starts with / and doesn't have double slashes
       String path = filePath.startsWith('/') ? filePath : '/$filePath';
-      debugPrint('Downloading file to open: ${Constants.baseUrl}$path');
-      await dio.download(path, savePath);
+      path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
+      
+      // URL encode the path to handle special characters (spaces, etc.)
+      // Split path into parts and encode each part separately
+      final pathParts = path.split('/');
+      final encodedParts = pathParts.map((part) {
+        if (part.isEmpty) return part;
+        return Uri.encodeComponent(part);
+      }).toList();
+      final encodedPath = encodedParts.join('/');
+      
+      debugPrint('Downloading file to open: ${Constants.baseUrl}$encodedPath -> $savePath');
+      debugPrint('Original path: $path, Encoded path: $encodedPath');
+      
+      // Download with error handling
+      try {
+        await dio.download(encodedPath, savePath);
+        debugPrint('File downloaded successfully: $savePath');
+      } on DioException catch (e) {
+        debugPrint('Download error: ${e.message}');
+        debugPrint('Response: ${e.response?.data}');
+        debugPrint('Status code: ${e.response?.statusCode}');
+        
+        if (e.response?.statusCode == 404) {
+          throw Exception('File not found on server. Path: $path');
+        } else if (e.response?.statusCode == 500) {
+          throw Exception('Server error while downloading file');
+        } else {
+          throw Exception('Failed to download file: ${e.message}');
+        }
+      }
+      
+      // Verify file was downloaded
+      final downloadedFile = File(savePath);
+      if (!await downloadedFile.exists()) {
+        throw Exception('Downloaded file not found at: $savePath');
+      }
+      
+      final fileSize = await downloadedFile.length();
+      if (fileSize == 0) {
+        throw Exception('Downloaded file is empty');
+      }
+      
+      debugPrint('File ready to open: $savePath (${fileSize} bytes)');
       
       if (!context.mounted) return;
       await OpenFile.open(savePath);
@@ -285,7 +404,10 @@ class MessageItem extends StatelessWidget {
       debugPrint('Open file error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cannot open file: ${e.toString()}')),
+        SnackBar(
+          content: Text('Cannot open file: ${e.toString()}'),
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
@@ -298,8 +420,29 @@ class MessageItem extends StatelessWidget {
     }
   }
 
+  String _getEncodedFullUrl() {
+    if (!message.hasAttachment) return '';
+    final raw = message.attachmentUrl!;
+    String url;
+    if (raw.startsWith('http')) {
+      url = raw;
+    } else {
+      String path = raw.startsWith('/') ? raw : '/$raw';
+      path = path.replaceAll(RegExp(r'//+'), '/');
+      // URL encode path parts
+      final pathParts = path.split('/');
+      final encodedParts = pathParts.map((part) {
+        if (part.isEmpty) return part;
+        return Uri.encodeComponent(part);
+      }).toList();
+      final encodedPath = encodedParts.join('/');
+      url = '${Constants.baseUrl}$encodedPath';
+    }
+    return url;
+  }
+
   Widget _buildImageAttachment(BuildContext context) {
-    final resolvedUrl = _getFullUrl();
+    final resolvedUrl = _getEncodedFullUrl();
     return Stack(
       children: [
         GestureDetector(
@@ -512,6 +655,116 @@ class MessageItem extends StatelessWidget {
         return Icons.archive;
       default:
         return Icons.attach_file;
+    }
+  }
+
+  Widget _buildMessageText(BuildContext context, String text, bool isMe) {
+    // Check if text contains URLs
+    if (!Helpers.containsUrl(text)) {
+      return Text(
+        text,
+        style: TextStyle(
+          color: isMe ? Colors.white : Colors.black87,
+          fontSize: 14,
+        ),
+      );
+    }
+
+    // Extract URLs and create clickable text using regex
+    final urlPattern = RegExp(
+      r'(https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*)',
+      caseSensitive: false,
+    );
+    
+    final parts = <TextSpan>[];
+    int lastIndex = 0;
+    
+    for (final match in urlPattern.allMatches(text)) {
+      // Add text before URL
+      if (match.start > lastIndex) {
+        parts.add(TextSpan(
+          text: text.substring(lastIndex, match.start),
+          style: TextStyle(
+            color: isMe ? Colors.white : Colors.black87,
+            fontSize: 14,
+          ),
+        ));
+      }
+
+      // Process the matched URL
+      String url = match.group(0)!;
+      String displayUrl = url;
+      
+      // Ensure URL has protocol
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://$url';
+      }
+      
+      // Truncate display URL if too long
+      final originalUrl = match.group(0)!;
+      if (originalUrl.length > 50) {
+        displayUrl = '${originalUrl.substring(0, 47)}...';
+      }
+
+      // Add clickable URL
+      parts.add(TextSpan(
+        text: displayUrl,
+        style: TextStyle(
+          color: isMe ? Colors.lightBlue.shade100 : Colors.blue,
+          fontSize: 14,
+          decoration: TextDecoration.underline,
+          decorationColor: isMe ? Colors.lightBlue.shade100 : Colors.blue,
+        ),
+        recognizer: TapGestureRecognizer()
+          ..onTap = () => _launchUrl(context, url),
+      ));
+
+      lastIndex = match.end;
+    }
+
+    // Add remaining text
+    if (lastIndex < text.length) {
+      parts.add(TextSpan(
+        text: text.substring(lastIndex),
+        style: TextStyle(
+          color: isMe ? Colors.white : Colors.black87,
+          fontSize: 14,
+        ),
+      ));
+    }
+
+    if (parts.isEmpty) {
+      return Text(
+        text,
+        style: TextStyle(
+          color: isMe ? Colors.white : Colors.black87,
+          fontSize: 14,
+        ),
+      );
+    }
+
+    return RichText(
+      text: TextSpan(children: parts),
+    );
+  }
+
+  Future<void> _launchUrl(BuildContext context, String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Cannot open URL: $url')),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error launching URL: $e');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error opening URL: ${e.toString()}')),
+      );
     }
   }
 }

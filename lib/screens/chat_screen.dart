@@ -87,6 +87,34 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          // WiFi Test Connection Button
+          Consumer<ConnectivityProvider>(
+            builder: (context, connectivityProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.wifi_find),
+                onPressed: () async {
+                  await connectivityProvider.refreshConnectivity();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          connectivityProvider.isConnectedToChatridge
+                              ? 'Successfully connected to Chatridge!'
+                              : 'Could not connect to Chatridge server. Please check your WiFi connection.',
+                        ),
+                        backgroundColor:
+                            connectivityProvider.isConnectedToChatridge
+                                ? Colors.green
+                                : Colors.orange,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                },
+                tooltip: 'Test WiFi Connection',
+              );
+            },
+          ),
           // Refresh Button
           Consumer<ChatProvider>(
             builder: (context, chatProvider, child) {
