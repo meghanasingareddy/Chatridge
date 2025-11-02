@@ -159,11 +159,76 @@ class MessageItem extends StatelessWidget {
     );
   }
 
+  // Sanitize filename to match ESP32's sanitizeFilename function
+  // ESP32 replaces commas, parentheses, and other special chars with underscores
+  // But keeps spaces, alphanumeric, dots, hyphens, and underscores
+  String _sanitizeFilename(String filename) {
+    // Remove leading slash if present for processing
+    final needsSlash = filename.startsWith('/');
+    final clean = needsSlash ? filename.substring(1) : filename;
+    
+    String sanitized = '';
+    for (int i = 0; i < clean.length; i++) {
+      final char = clean[i];
+      // Allow alphanumeric, dots, hyphens, underscores, and spaces
+      if ((char.codeUnitAt(0) >= 'a'.codeUnitAt(0) && char.codeUnitAt(0) <= 'z'.codeUnitAt(0)) ||
+          (char.codeUnitAt(0) >= 'A'.codeUnitAt(0) && char.codeUnitAt(0) <= 'Z'.codeUnitAt(0)) ||
+          (char.codeUnitAt(0) >= '0'.codeUnitAt(0) && char.codeUnitAt(0) <= '9'.codeUnitAt(0)) ||
+          char == '.' || char == '-' || char == '_' || char == ' ') {
+        sanitized += char;
+      } else {
+        // Replace invalid characters (comma, parentheses, etc.) with underscore
+        sanitized += '_';
+      }
+    }
+    
+    return needsSlash ? '/$sanitized' : sanitized;
+  }
+
   String _resolvedUrl() {
     if (!message.hasAttachment) return '';
     final raw = message.attachmentUrl!;
+    
+    debugPrint('_resolvedUrl: raw attachmentUrl = "$raw"');
+    
     // Return just the path, not full URL (Dio will use baseUrl)
-    return raw.startsWith('http') ? raw.replaceFirst(RegExp(r'^https?://[^/]+'), '') : raw;
+    final path = raw.startsWith('http') ? raw.replaceFirst(RegExp(r'^https?://[^/]+'), '') : raw;
+    
+    debugPrint('_resolvedUrl: extracted path = "$path"');
+    
+    // Check if filename needs sanitization (has commas or parentheses)
+    // ESP32 sanitizes on upload, but old messages might have unsanitized names
+    if (path.isNotEmpty && path.contains('/')) {
+      final pathParts = path.split('/');
+      if (pathParts.length > 1) {
+        final filename = pathParts.last;
+        debugPrint('_resolvedUrl: filename from path = "$filename"');
+        
+        // Check if filename needs sanitization (contains commas or parentheses)
+        final needsSanitization = filename.contains(',') || 
+                                  filename.contains('(') || 
+                                  filename.contains(')');
+        
+        if (needsSanitization) {
+          debugPrint('_resolvedUrl: filename needs sanitization (contains special chars)');
+          final sanitizedFilename = _sanitizeFilename(filename);
+          debugPrint('_resolvedUrl: sanitized filename = "$sanitizedFilename"');
+          
+          // Reconstruct path with sanitized filename
+          pathParts[pathParts.length - 1] = sanitizedFilename.startsWith('/') 
+              ? sanitizedFilename.substring(1) 
+              : sanitizedFilename;
+          final finalPath = pathParts.join('/');
+          debugPrint('_resolvedUrl: final sanitized path = "$finalPath"');
+          return finalPath;
+        } else {
+          debugPrint('_resolvedUrl: filename already sanitized, using as-is');
+        }
+      }
+    }
+    
+    debugPrint('_resolvedUrl: returning path = "$path"');
+    return path;
   }
   
   String _getFullUrl() {
@@ -192,19 +257,26 @@ class MessageItem extends StatelessWidget {
         },
       ));
       
-      final dir = await getApplicationDocumentsDirectory();
+      // Get download directory (custom or default)
+      final dir = await StorageService.getDownloadDirectory();
+      final downloadDir = Directory(dir);
+      if (!downloadDir.existsSync()) {
+        downloadDir.createSync(recursive: true);
+      }
       
-      // Use attachment name, fallback to filename from URL
+      // Use attachment name, fallback to filename from URL (sanitized)
       String filename = message.attachmentName ?? 'file';
       if (filename.isEmpty) {
         final pathParts = filePath.split('/');
         filename = pathParts.isNotEmpty ? pathParts.last : 'file';
       }
       
-      // Ensure filename is safe for filesystem
+      // Sanitize filename for local filesystem (remove invalid Windows chars)
       filename = filename.replaceAll(RegExp(r'[<>:"|?*]'), '_');
       
-      final savePath = '${dir.path}/$filename';
+      final savePath = Platform.isWindows 
+          ? '$dir\\$filename' 
+          : '$dir/$filename';
       
       // Normalize path - ensure it starts with / and doesn't have double slashes
       String path = filePath.startsWith('/') ? filePath : '/$filePath';
@@ -281,11 +353,26 @@ class MessageItem extends StatelessWidget {
         },
       ));
       
-      final tempDir = await getTemporaryDirectory();
-      final filename = message.attachmentName ?? 'file';
-      final savePath = '${tempDir.path}/$filename';
+      // Use download directory for shared files too
+      final dir = await StorageService.getDownloadDirectory();
+      final downloadDir = Directory(dir);
+      if (!downloadDir.existsSync()) {
+        downloadDir.createSync(recursive: true);
+      }
       
-      // Ensure path starts with /
+      String filename = message.attachmentName ?? 'file';
+      if (filename.isEmpty) {
+        final pathParts = filePath.split('/');
+        filename = pathParts.isNotEmpty ? pathParts.last : 'file';
+      }
+      
+      // Sanitize filename for local filesystem
+      filename = filename.replaceAll(RegExp(r'[<>:"|?*]'), '_');
+      final savePath = Platform.isWindows 
+          ? '$dir\\$filename' 
+          : '$dir/$filename';
+      
+      // Normalize path - ensure it starts with / and doesn't have double slashes
       String path = filePath.startsWith('/') ? filePath : '/$filePath';
       path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
       
@@ -320,7 +407,13 @@ class MessageItem extends StatelessWidget {
   Future<void> _openDocument(BuildContext context) async {
     try {
       final filePath = _resolvedUrl();
-      if (filePath.isEmpty) throw Exception('Missing file path');
+      if (filePath.isEmpty) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Missing file path')),
+        );
+        return;
+      }
       
       debugPrint('Opening document: original URL=${message.attachmentUrl}, resolved=$filePath');
       
@@ -336,9 +429,15 @@ class MessageItem extends StatelessWidget {
         },
       ));
       
-      final tempDir = await getTemporaryDirectory();
+      // Get download directory (custom or default) for opening files
+      // We use download directory so files can be opened after download
+      final dir = await StorageService.getDownloadDirectory();
+      final downloadDir = Directory(dir);
+      if (!downloadDir.existsSync()) {
+        downloadDir.createSync(recursive: true);
+      }
       
-      // Use attachment name, fallback to filename from URL
+      // Use attachment name, fallback to filename from URL (use sanitized version)
       String fileName = message.attachmentName ?? 'file';
       if (fileName.isEmpty) {
         // Extract filename from URL path
@@ -346,60 +445,226 @@ class MessageItem extends StatelessWidget {
         fileName = pathParts.isNotEmpty ? pathParts.last : 'file';
       }
       
-      // Ensure filename is safe for filesystem
+      // Sanitize filename for local filesystem (remove invalid Windows chars)
       fileName = fileName.replaceAll(RegExp(r'[<>:"|?*]'), '_');
       
-      final savePath = '${tempDir.path}/$fileName';
+      final savePath = Platform.isWindows 
+          ? '$dir\\$fileName' 
+          : '$dir/$fileName';
       
       // Normalize path - ensure it starts with / and doesn't have double slashes
       String path = filePath.startsWith('/') ? filePath : '/$filePath';
       path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
       
-      // URL encode the path to handle special characters (spaces, etc.)
-      // Split path into parts and encode each part separately
-      final pathParts = path.split('/');
-      final encodedParts = pathParts.map((part) {
-        if (part.isEmpty) return part;
-        return Uri.encodeComponent(part);
-      }).toList();
-      final encodedPath = encodedParts.join('/');
+      // Try multiple path formats to handle different scenarios
+      final pathsToTry = <String>[];
       
-      debugPrint('Downloading file to open: ${Constants.baseUrl}$encodedPath -> $savePath');
-      debugPrint('Original path: $path, Encoded path: $encodedPath');
+      // 1. Sanitized path (what we expect from ESP32)
+      pathsToTry.add(path);
       
-      // Download with error handling
-      try {
-        await dio.download(encodedPath, savePath);
-        debugPrint('File downloaded successfully: $savePath');
-      } on DioException catch (e) {
-        debugPrint('Download error: ${e.message}');
-        debugPrint('Response: ${e.response?.data}');
-        debugPrint('Status code: ${e.response?.statusCode}');
+      // 2. If path has underscores that might have been spaces, try with original special chars
+      // But only if the original message URL had special chars
+      if (message.attachmentUrl != null && 
+          (message.attachmentUrl!.contains(',') || 
+           message.attachmentUrl!.contains('(') || 
+           message.attachmentUrl!.contains(')'))) {
+        // Try the original unsanitized path as fallback
+        final originalPath = message.attachmentUrl!.startsWith('/') 
+            ? message.attachmentUrl! 
+            : '/${message.attachmentUrl!}';
+        pathsToTry.add(originalPath);
+      }
+      
+      // Try each path format
+      bool downloadSuccess = false;
+      DioException? lastError;
+      
+      for (final tryPath in pathsToTry) {
+        // URL encode the path to handle special characters (spaces, etc.)
+        final pathParts = tryPath.split('/');
+        final encodedParts = pathParts.map((part) {
+          if (part.isEmpty) return part;
+          return Uri.encodeComponent(part);
+        }).toList();
+        final encodedPath = encodedParts.join('/');
         
-        if (e.response?.statusCode == 404) {
-          throw Exception('File not found on server. Path: $path');
-        } else if (e.response?.statusCode == 500) {
-          throw Exception('Server error while downloading file');
-        } else {
-          throw Exception('Failed to download file: ${e.message}');
+        debugPrint('Trying to download: ${Constants.baseUrl}$encodedPath -> $savePath');
+        
+        try {
+          await dio.download(encodedPath, savePath);
+          final downloadedFile = File(savePath);
+          if (await downloadedFile.exists() && await downloadedFile.length() > 0) {
+            downloadSuccess = true;
+            debugPrint('File downloaded successfully: $savePath');
+            break;
+          }
+        } on DioException catch (e) {
+          debugPrint('Download error for path $tryPath: ${e.message}');
+          debugPrint('Status code: ${e.response?.statusCode}');
+          lastError = e;
+          // Continue to try next path
+        } catch (e) {
+          debugPrint('Unexpected error: $e');
+          lastError = DioException(
+            requestOptions: RequestOptions(path: tryPath),
+            type: DioExceptionType.unknown,
+            error: e,
+          );
         }
+      }
+      
+      if (!downloadSuccess) {
+        if (!context.mounted) return;
+        
+        // Show detailed error with all attempted paths
+        final originalUrl = message.attachmentUrl ?? 'null';
+        final resolvedUrl = filePath;
+        
+        String errorMsg = '❌ File not found on server.\n\n';
+        errorMsg += '📁 Original URL: $originalUrl\n';
+        errorMsg += '🔍 Resolved path: $resolvedUrl\n';
+        errorMsg += '📝 Attempted paths:\n';
+        for (int i = 0; i < pathsToTry.length; i++) {
+          errorMsg += '  ${i + 1}. ${pathsToTry[i]}\n';
+        }
+        
+        if (lastError?.response?.statusCode == 404) {
+          errorMsg += '\n⚠️ All paths returned 404. The file may not exist on ESP32.';
+        } else if (lastError?.response?.statusCode == 500) {
+          errorMsg += '\n⚠️ Server error (500). ESP32 may be having issues.';
+        } else {
+          errorMsg += '\n⚠️ Error: ${lastError?.message ?? "Unknown error"}';
+        }
+        
+        errorMsg += '\n\n💡 Try re-uploading the file, or check ESP32 Serial Monitor for available files.';
+        
+        // Show as dialog instead of snackbar for better readability
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('File Not Found'),
+            content: SingleChildScrollView(
+              child: Text(
+                errorMsg,
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // Try to copy error to clipboard would be nice, but keep it simple
+                },
+                child: const Text('Copy Error'),
+              ),
+            ],
+          ),
+        );
+        return;
       }
       
       // Verify file was downloaded
       final downloadedFile = File(savePath);
       if (!await downloadedFile.exists()) {
-        throw Exception('Downloaded file not found at: $savePath');
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Downloaded file not found')),
+        );
+        return;
       }
       
       final fileSize = await downloadedFile.length();
       if (fileSize == 0) {
-        throw Exception('Downloaded file is empty');
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Downloaded file is empty')),
+        );
+        return;
       }
       
       debugPrint('File ready to open: $savePath (${fileSize} bytes)');
       
       if (!context.mounted) return;
-      await OpenFile.open(savePath);
+      
+      // On Windows, try multiple methods to open the file
+      bool openedSuccessfully = false;
+      
+      if (Platform.isWindows) {
+        // Method 1: Try Windows start command with proper path handling
+        try {
+          // Ensure Windows path format
+          final normalizedPath = savePath.replaceAll('/', '\\');
+          
+          // Verify file exists before trying to open
+          final file = File(normalizedPath);
+          if (!await file.exists()) {
+            throw Exception('File not found: $normalizedPath');
+          }
+          
+          // Use start command - the "" is for window title, path must be properly quoted
+          await Process.run(
+            'cmd',
+            ['/c', 'start', '""', normalizedPath],
+            runInShell: true,
+          );
+          
+          // Start command returns immediately, assume success if no exception
+          openedSuccessfully = true;
+          debugPrint('File opened using Windows start command: $normalizedPath');
+        } catch (e) {
+          debugPrint('Windows start command failed: $e');
+          
+          // Method 2: Try open_file package
+          try {
+            final result = await OpenFile.open(savePath);
+            debugPrint('OpenFile result: ${result.type}, message: ${result.message}');
+            if (result.type == ResultType.done) {
+              openedSuccessfully = true;
+              debugPrint('File opened using OpenFile package');
+            } else {
+              // If open_file says no app, try url_launcher
+              if (result.type == ResultType.noAppToOpen) {
+                final normalizedPath = savePath.replaceAll('/', '\\');
+                final fileUri = Uri.file(normalizedPath);
+                if (await canLaunchUrl(fileUri)) {
+                  await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+                  openedSuccessfully = true;
+                  debugPrint('File opened using url_launcher');
+                }
+              }
+            }
+          } catch (e2) {
+            debugPrint('OpenFile package failed: $e2');
+          }
+        }
+      } else {
+        // Non-Windows platforms: use open_file package
+        try {
+          final result = await OpenFile.open(savePath);
+          if (result.type == ResultType.done) {
+            openedSuccessfully = true;
+            debugPrint('File opened successfully');
+          }
+        } catch (e) {
+          debugPrint('OpenFile failed: $e');
+        }
+      }
+      
+      // Only show error if all methods failed
+      if (!openedSuccessfully) {
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Cannot open file. File saved to: $savePath'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+      // If opened successfully, don't show any message (silent success)
     } catch (e) {
       debugPrint('Open file error: $e');
       if (!context.mounted) return;
@@ -574,58 +839,55 @@ class MessageItem extends StatelessWidget {
   }
 
   Widget _buildDocumentAttachment(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            _getDocumentIcon(),
-            color: Colors.grey.shade600,
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.attachmentName ?? 'Unknown file',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  'Open or download',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
+    return GestureDetector(
+      onTap: () => _openDocument(context),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _getDocumentIcon(),
+              color: Colors.grey.shade600,
             ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            tooltip: 'Open',
-            icon: const Icon(Icons.open_in_new),
-            color: Colors.blueGrey,
-            onPressed: () => _openDocument(context),
-          ),
-          IconButton(
-            tooltip: 'Download',
-            icon: const Icon(Icons.download),
-            color: Colors.blueGrey,
-            onPressed: () => _downloadAttachment(context),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message.attachmentName ?? 'Unknown file',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    'Tap to open',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'Download',
+              icon: const Icon(Icons.download),
+              color: Colors.blueGrey,
+              onPressed: () => _downloadAttachment(context),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/chat_provider.dart';
 import '../providers/device_provider.dart';
 import '../providers/theme_provider.dart';
@@ -18,6 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _deviceName;
   int _pollingInterval = 2;
   ThemeMode? _themeMode;
+  String? _downloadPath;
 
   @override
   void initState() {
@@ -30,13 +33,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final deviceName = StorageService.getDeviceName();
     final pollingInterval = StorageService.getPollingInterval();
     final themeMode = StorageService.getThemeMode() ?? ThemeMode.system;
+    final downloadPath = StorageService.getDownloadPath();
+    final defaultPath = await StorageService.getDefaultDownloadDirectory();
 
     setState(() {
       _username = username;
       _deviceName = deviceName;
       _pollingInterval = pollingInterval;
       _themeMode = themeMode;
+      _downloadPath = downloadPath ?? defaultPath;
     });
+  }
+
+  Future<void> _pickDownloadFolder() async {
+    String? selectedDirectory;
+    
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      // Desktop platforms - use file_picker to select directory
+      selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    } else {
+      // Mobile platforms - show dialog with options
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Download Location'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Choose download location:'),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.folder),
+                title: const Text('Default (Downloads)'),
+                onTap: () => Navigator.of(context).pop('default'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder_special),
+                title: const Text('Documents'),
+                onTap: () => Navigator.of(context).pop('documents'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+      
+      if (result == 'default') {
+        selectedDirectory = await StorageService.getDefaultDownloadDirectory();
+      } else if (result == 'documents') {
+        // Use documents directory
+        final dir = await StorageService.getDefaultDownloadDirectory();
+        selectedDirectory = dir; // This already defaults to appropriate location
+      }
+    }
+
+    if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
+      await StorageService.saveDownloadPath(selectedDirectory);
+      setState(() {
+        _downloadPath = selectedDirectory;
+      });
+      if (mounted) {
+        Helpers.showSnackBar(context, 'Download location updated');
+      }
+    }
+  }
+
+  Future<void> _resetDownloadPath() async {
+    await StorageService.saveDownloadPath(null);
+    final defaultPath = await StorageService.getDefaultDownloadDirectory();
+    setState(() {
+      _downloadPath = defaultPath;
+    });
+    if (mounted) {
+      Helpers.showSnackBar(context, 'Download location reset to default');
+    }
   }
 
   void _showChangeUsernameDialog() {
@@ -387,6 +462,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: Text('$_pollingInterval seconds'),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: _showPollingIntervalDialog,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // File Settings Section
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'File Settings',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FutureBuilder<String>(
+                    future: StorageService.getDownloadDirectory(),
+                    builder: (context, snapshot) {
+                      final displayPath = snapshot.data ?? _downloadPath ?? 'Loading...';
+                      return ListTile(
+                        leading: const Icon(Icons.download),
+                        title: const Text('Download Location'),
+                        subtitle: Text(
+                          displayPath,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: _pickDownloadFolder,
+                      );
+                    },
+                  ),
+                  FutureBuilder<String>(
+                    future: StorageService.getDefaultDownloadDirectory(),
+                    builder: (context, snapshot) {
+                      final defaultPath = snapshot.data ?? '';
+                      if (_downloadPath != null && _downloadPath != defaultPath) {
+                        return ListTile(
+                          leading: const Icon(Icons.refresh),
+                          title: const Text('Reset to Default'),
+                          subtitle: const Text('Use default download location'),
+                          trailing: const Icon(Icons.arrow_forward_ios),
+                          onTap: _resetDownloadPath,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
                   ),
                 ],
               ),
