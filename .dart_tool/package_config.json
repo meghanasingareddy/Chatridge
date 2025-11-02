@@ -14,6 +14,12 @@
       "languageVersion": "2.17"
     },
     {
+      "name": "archive",
+      "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/archive-4.0.7",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
+    },
+    {
       "name": "args",
       "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/args-2.7.0",
       "packageUri": "lib/",
@@ -90,6 +96,12 @@
       "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/checked_yaml-2.0.4",
       "packageUri": "lib/",
       "languageVersion": "3.8"
+    },
+    {
+      "name": "cli_util",
+      "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/cli_util-0.4.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
     },
     {
       "name": "clock",
@@ -230,6 +242,12 @@
       "languageVersion": "3.8"
     },
     {
+      "name": "flutter_launcher_icons",
+      "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_launcher_icons-0.13.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.18"
+    },
+    {
       "name": "flutter_lints",
       "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_lints-2.0.3",
       "packageUri": "lib/",
@@ -306,6 +324,12 @@
       "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/http_parser-4.1.2",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "image",
+      "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/image-4.5.4",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "image_picker",
@@ -600,6 +624,12 @@
       "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/pool-1.5.2",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "posix",
+      "rootUri": "file:///C:/Users/tripu/AppData/Local/Pub/Cache/hosted/pub.dev/posix-6.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "provider",

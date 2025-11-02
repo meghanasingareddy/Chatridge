@@ -16,11 +16,36 @@ class ConversationsScreen extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Conversations'),
         actions: [
+          // Refresh Button
+          Consumer2<ChatProvider, DeviceProvider>(
+            builder: (context, chatProvider, deviceProvider, child) {
+              return IconButton(
+                icon: chatProvider.isLoading || deviceProvider.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.refresh),
+                onPressed: (chatProvider.isLoading || deviceProvider.isLoading)
+                    ? null
+                    : () async {
+                        await chatProvider.fetchMessages();
+                        await deviceProvider.fetchDevices();
+                      },
+                tooltip: 'Refresh conversations',
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
               // TODO: Add search functionality
             },
+            tooltip: 'Search conversations',
           ),
           IconButton(
             icon: const Icon(Icons.settings),
@@ -31,6 +56,7 @@ class ConversationsScreen extends StatelessWidget {
                 ),
               );
             },
+            tooltip: 'Settings',
           ),
         ],
       ),
@@ -43,6 +69,7 @@ class ConversationsScreen extends StatelessWidget {
           final conversations = _getConversations(messages, devices);
 
           if (conversations.isEmpty) {
+            final theme = Theme.of(context);
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -50,14 +77,14 @@ class ConversationsScreen extends StatelessWidget {
                   Icon(
                     Icons.chat_bubble_outline,
                     size: 64,
-                    color: Colors.grey.shade400,
+                    color: theme.colorScheme.onSurface.withOpacity(0.4),
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No conversations yet',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey.shade600,
+                      color: theme.colorScheme.onSurface.withOpacity(0.6),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -65,7 +92,7 @@ class ConversationsScreen extends StatelessWidget {
                     'Start chatting to see conversations here',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.grey.shade500,
+                      color: theme.colorScheme.onSurface.withOpacity(0.5),
                     ),
                   ),
                 ],
@@ -87,84 +114,90 @@ class ConversationsScreen extends StatelessWidget {
                 final unreadCount = conversation['unreadCount'] as int;
                 final isPrivate = conversation['isPrivate'] as bool;
 
-                return ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Helpers.getAvatarColor(participant),
-                    child: Text(
-                      Helpers.getInitials(participant),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+                final theme = Theme.of(context);
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  elevation: unreadCount > 0 ? 2 : 0,
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: Helpers.getAvatarColor(participant),
+                      child: Text(
+                        Helpers.getInitials(participant),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                  title: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          isPrivate ? participant : 'Group Chat',
-                          style: TextStyle(
-                            fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                      if (isPrivate)
-                        const Icon(
-                          Icons.lock,
-                          size: 16,
-                          color: Colors.blue,
-                        ),
-                    ],
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 4),
-                      Text(
-                        lastMessage['text'] as String,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        _formatTime(lastMessage['timestamp'] as DateTime),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  trailing: unreadCount > 0
-                      ? Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).primaryColor,
-                            shape: BoxShape.circle,
-                          ),
+                    title: Row(
+                      children: [
+                        Expanded(
                           child: Text(
-                            unreadCount > 9 ? '9+' : '$unreadCount',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                            isPrivate ? participant : 'Group Chat',
+                            style: TextStyle(
+                              fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                              color: theme.colorScheme.onSurface,
                             ),
                           ),
-                        )
-                      : null,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (context) => ChatScreen(
-                          initialTarget: isPrivate ? participant : null,
                         ),
-                      ),
-                    );
-                  },
+                        if (isPrivate)
+                          Icon(
+                            Icons.lock,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 4),
+                        Text(
+                          lastMessage['text'] as String,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurface.withOpacity(0.7),
+                            fontWeight: unreadCount > 0 ? FontWeight.w500 : FontWeight.normal,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _formatTime(lastMessage['timestamp'] as DateTime),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                    trailing: unreadCount > 0
+                        ? Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              unreadCount > 9 ? '9+' : '$unreadCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          )
+                        : null,
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => ChatScreen(
+                            initialTarget: isPrivate ? participant : null,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
                 );
               },
             ),
@@ -198,17 +231,22 @@ class ConversationsScreen extends StatelessWidget {
       String participant;
 
       if (message.target != null && message.target.isNotEmpty) {
-        // Private message
-        if (message.username == myUsername) {
-          participant = message.target;
-        } else {
+        // Private message - determine participant based on who sent it and who it's for
+        if (message.username == myUsername || message.username == myDeviceName) {
+          // Message sent by me
+          participant = message.target ?? message.username;
+        } else if (message.target == myDeviceName || message.target == myUsername) {
+          // Message sent to me
           participant = message.username;
+        } else {
+          // Message between others, skip if not relevant to me
+          continue;
         }
         conversationKey = 'private_$participant';
       } else {
         // Group message
         conversationKey = 'group';
-        participant = 'Group';
+        participant = 'Group Chat';
       }
 
       if (!conversationsMap.containsKey(conversationKey)) {

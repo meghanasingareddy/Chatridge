@@ -161,11 +161,16 @@ class ApiService {
       }
 
       // Handle Windows paths (backslashes) and Unix paths (forward slashes)
-      final filename = file.path.split(Platform.pathSeparator).last;
+      // Normalize the file path for cross-platform compatibility
+      final normalizedPath = file.path.replaceAll('\\', '/');
+      final filename = normalizedPath.split('/').last;
+      
+      // Read file bytes to ensure compatibility with all platforms
+      final fileBytes = await file.readAsBytes();
       
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          file.path,
+        'file': MultipartFile.fromBytes(
+          fileBytes,
           filename: filename,
         ),
         'username': username,

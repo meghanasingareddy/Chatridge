@@ -5,6 +5,7 @@ import 'app.dart';
 import 'providers/connectivity_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/device_provider.dart';
+import 'providers/theme_provider.dart';
 import 'services/storage_service.dart';
 
 void main() async {
@@ -52,11 +53,14 @@ class ChatridgeApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => ConnectivityProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => DeviceProvider()),
       ],
-      child: MaterialApp(
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, child) {
+          return MaterialApp(
         title: 'Chatridge',
         theme: ThemeData(
           useMaterial3: true,
@@ -99,12 +103,12 @@ class ChatridgeApp extends StatelessWidget {
           ),
           primaryColor: const Color(0xFF3498DB),
           scaffoldBackgroundColor: const Color(0xFF121212),
+          cardColor: const Color(0xFF1E1E1E),
           appBarTheme: const AppBarTheme(
             backgroundColor: Color(0xFF1E1E1E),
             foregroundColor: Colors.white,
             elevation: 0,
           ),
-          cardColor: const Color(0xFF1E1E1E),
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF3498DB),
@@ -114,10 +118,22 @@ class ChatridgeApp extends StatelessWidget {
               ),
             ),
           ),
+          inputDecorationTheme: InputDecorationTheme(
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: Color(0xFF3498DB)),
+            ),
+          ),
+          dividerColor: Colors.grey.shade800,
         ),
-        themeMode: ThemeMode.system, // Auto dark mode based on system
+        themeMode: themeProvider.themeMode, // User-selected or system default
         home: const App(),
         debugShowCheckedModeBanner: false,
+          );
+        },
       ),
     );
   }

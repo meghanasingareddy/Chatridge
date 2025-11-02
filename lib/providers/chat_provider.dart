@@ -71,16 +71,22 @@ class ChatProvider extends ChangeNotifier {
 
       // Update local messages with server data
       // Remove local messages that might have been replaced by server messages
+      // Use a more aggressive deduplication strategy
       final serverIds = serverMessages.map((m) => m.id).toSet();
-      _messages.removeWhere((msg) => 
-        msg.isLocal && 
-        serverMessages.any((sm) => 
+      final myUsername = StorageService.getUsername();
+      
+      _messages.removeWhere((msg) {
+        if (!msg.isLocal) return false;
+        
+        // Remove if we find a server message with same content and username
+        return serverMessages.any((sm) => 
           sm.username == msg.username &&
           sm.text == msg.text &&
           sm.target == msg.target &&
-          sm.timestamp.difference(msg.timestamp).inSeconds.abs() < 10
-        )
-      );
+          sm.timestamp.difference(msg.timestamp).inSeconds.abs() < 30 &&
+          (msg.username == myUsername || sm.username == myUsername) // Only for messages we sent
+        );
+      });
 
       for (final serverMessage in serverMessages) {
         final existingIndex = _messages.indexWhere(
@@ -147,11 +153,13 @@ class ChatProvider extends ChangeNotifier {
       );
 
       if (success) {
-        // Remove local message - it will be replaced by server message on next fetch
-        // This prevents duplicates
+        // Remove local message immediately to prevent duplicates
         _messages.removeWhere((msg) => msg.id == localMessage!.id);
         await StorageService.deleteMessage(localMessage.id);
-        // Immediately fetch to get server message with proper ID
+        notifyListeners(); // Update UI immediately
+        
+        // Fetch messages after a short delay to get server message
+        await Future.delayed(const Duration(milliseconds: 300));
         await fetchMessages();
       } else {
         // Remove failed message
@@ -208,6 +216,10 @@ class ChatProvider extends ChangeNotifier {
 
       if (attachmentUrl != null) {
         // Create message with attachment
+        // Normalize file path for cross-platform compatibility
+        final normalizedPath = filePath.replaceAll('\\', '/');
+        final fileName = normalizedPath.split('/').last;
+        
         final message = Message(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           username: username,
@@ -215,23 +227,28 @@ class ChatProvider extends ChangeNotifier {
           target: target,
           timestamp: DateTime.now(),
           attachmentUrl: attachmentUrl,
-          attachmentName: filePath.split(Platform.pathSeparator).last,
+          attachmentName: fileName,
           attachmentType: _getFileType(filePath),
         );
 
         // Remove any local message with same content to prevent duplicates
+        final now = DateTime.now();
         _messages.removeWhere((msg) => 
           msg.username == username &&
           msg.text == 'Shared a file' &&
           msg.target == target &&
-          msg.timestamp.difference(DateTime.now()).inSeconds.abs() < 5
+          msg.attachmentName == message.attachmentName &&
+          msg.timestamp.difference(now).inSeconds.abs() < 10 &&
+          msg.isLocal
         );
         
         _messages.add(message);
         await StorageService.saveMessage(message);
+        notifyListeners(); // Update UI immediately
         debugPrint('ChatProvider: File message created and saved');
         
-        // Immediately fetch to get server message with proper ID
+        // Fetch messages after a short delay to get server message with proper ID
+        await Future.delayed(const Duration(milliseconds: 500));
         await fetchMessages();
       } else {
         debugPrint('ChatProvider: File upload failed - no URL returned');

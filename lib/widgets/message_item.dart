@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:open_file/open_file.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
@@ -160,40 +161,82 @@ class MessageItem extends StatelessWidget {
   String _resolvedUrl() {
     if (!message.hasAttachment) return '';
     final raw = message.attachmentUrl!;
-    final full = raw.startsWith('http') ? raw : '${Constants.baseUrl}$raw';
-    return Uri.parse(full).toString();
+    // Return just the path, not full URL (Dio will use baseUrl)
+    return raw.startsWith('http') ? raw.replaceFirst(RegExp(r'^https?://[^/]+'), '') : raw;
+  }
+  
+  String _getFullUrl() {
+    if (!message.hasAttachment) return '';
+    final raw = message.attachmentUrl!;
+    if (raw.startsWith('http')) return raw;
+    return '${Constants.baseUrl}${raw.startsWith('/') ? raw : '/$raw'}';
   }
 
   Future<void> _downloadAttachment(BuildContext context) async {
     try {
-      final url = _resolvedUrl();
-      if (url.isEmpty) throw Exception('Missing URL');
+      final filePath = _resolvedUrl();
+      if (filePath.isEmpty) throw Exception('Missing file path');
+      
+      // Create properly configured Dio instance with baseUrl
+      final dio = Dio(BaseOptions(
+        baseUrl: Constants.baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      ));
+      
       final dir = await getApplicationDocumentsDirectory();
       final filename = message.attachmentName ?? 'file';
       final savePath = '${dir.path}/$filename';
-      await Dio().download(url, savePath);
+      
+      // Ensure path starts with /
+      String path = filePath.startsWith('/') ? filePath : '/$filePath';
+      debugPrint('Downloading file: ${Constants.baseUrl}$path');
+      
+      await dio.download(path, savePath);
+      
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Saved to $savePath')),
       );
     } catch (e) {
+      debugPrint('Download error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Download failed: $e')),
+        SnackBar(content: Text('Download failed: ${e.toString()}')),
       );
     }
   }
 
   Future<void> _shareAttachment(BuildContext context) async {
     try {
-      final url = _resolvedUrl();
-      if (url.isEmpty) throw Exception('Missing URL');
+      final filePath = _resolvedUrl();
+      if (filePath.isEmpty) throw Exception('Missing file path');
+      
+      // Create properly configured Dio instance with baseUrl
+      final dio = Dio(BaseOptions(
+        baseUrl: Constants.baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      ));
+      
       final tempDir = await getTemporaryDirectory();
       final filename = message.attachmentName ?? 'file';
       final savePath = '${tempDir.path}/$filename';
       
-      // Download file first
-      await Dio().download(url, savePath);
+      // Ensure path starts with /
+      String path = filePath.startsWith('/') ? filePath : '/$filePath';
+      debugPrint('Downloading file for share: ${Constants.baseUrl}$path');
+      await dio.download(path, savePath);
       
       if (!context.mounted) return;
       
@@ -203,23 +246,46 @@ class MessageItem extends StatelessWidget {
         text: message.attachmentName ?? 'Shared file',
       );
     } catch (e) {
+      debugPrint('Share error: $e');
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Share failed: $e')),
+        SnackBar(content: Text('Share failed: ${e.toString()}')),
       );
     }
   }
 
   Future<void> _openDocument(BuildContext context) async {
     try {
-      final url = _resolvedUrl();
+      final filePath = _resolvedUrl();
+      if (filePath.isEmpty) throw Exception('Missing file path');
+      
+      // Create properly configured Dio instance with baseUrl
+      final dio = Dio(BaseOptions(
+        baseUrl: Constants.baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      ));
+      
       final tempDir = await getTemporaryDirectory();
       final savePath = '${tempDir.path}/${message.attachmentName ?? 'file'}';
-      await Dio().download(url, savePath);
+      
+      // Ensure path starts with /
+      String path = filePath.startsWith('/') ? filePath : '/$filePath';
+      debugPrint('Downloading file to open: ${Constants.baseUrl}$path');
+      await dio.download(path, savePath);
+      
+      if (!context.mounted) return;
       await OpenFile.open(savePath);
     } catch (e) {
+      debugPrint('Open file error: $e');
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cannot open file: $e')),
+        SnackBar(content: Text('Cannot open file: ${e.toString()}')),
       );
     }
   }
@@ -233,7 +299,7 @@ class MessageItem extends StatelessWidget {
   }
 
   Widget _buildImageAttachment(BuildContext context) {
-    final resolvedUrl = _resolvedUrl();
+    final resolvedUrl = _getFullUrl();
     return Stack(
       children: [
         GestureDetector(

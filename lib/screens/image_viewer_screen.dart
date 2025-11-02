@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../utils/constants.dart';
 
 class ImageViewerScreen extends StatelessWidget {
   const ImageViewerScreen({
@@ -35,8 +37,32 @@ class ImageViewerScreen extends StatelessWidget {
                 final fileName = imageName ?? 'image.jpg';
                 final savePath = '${tempDir.path}/$fileName';
                 
-                // Download image first
-                await Dio().download(imageUrl, savePath);
+                // Extract path from URL
+                String path = imageUrl;
+                if (imageUrl.startsWith(Constants.baseUrl)) {
+                  path = imageUrl.substring(Constants.baseUrl.length);
+                } else if (imageUrl.startsWith('http')) {
+                  // Full URL, extract just path
+                  final uri = Uri.parse(imageUrl);
+                  path = uri.path;
+                }
+                
+                // Create Dio instance with baseUrl
+                final dio = Dio(BaseOptions(
+                  baseUrl: Constants.baseUrl,
+                  connectTimeout: const Duration(seconds: 30),
+                  receiveTimeout: const Duration(seconds: 60),
+                  headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                  },
+                ));
+                
+                // Ensure path starts with /
+                if (!path.startsWith('/')) path = '/$path';
+                debugPrint('Downloading image for share: ${Constants.baseUrl}$path');
+                await dio.download(path, savePath);
                 
                 if (!context.mounted) return;
                 
@@ -46,9 +72,10 @@ class ImageViewerScreen extends StatelessWidget {
                   text: imageName ?? 'Shared image',
                 );
               } catch (e) {
+                debugPrint('Share image error: $e');
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Share failed: $e')),
+                  SnackBar(content: Text('Share failed: ${e.toString()}')),
                 );
               }
             },
@@ -61,15 +88,43 @@ class ImageViewerScreen extends StatelessWidget {
                 final tempDir = await getTemporaryDirectory();
                 final fileName = imageName ?? 'image.jpg';
                 final savePath = '${tempDir.path}/$fileName';
-                await Dio().download(imageUrl, savePath);
+                
+                // Extract path from URL
+                String path = imageUrl;
+                if (imageUrl.startsWith(Constants.baseUrl)) {
+                  path = imageUrl.substring(Constants.baseUrl.length);
+                } else if (imageUrl.startsWith('http')) {
+                  // Full URL, extract just path
+                  final uri = Uri.parse(imageUrl);
+                  path = uri.path;
+                }
+                
+                // Create Dio instance with baseUrl
+                final dio = Dio(BaseOptions(
+                  baseUrl: Constants.baseUrl,
+                  connectTimeout: const Duration(seconds: 30),
+                  receiveTimeout: const Duration(seconds: 60),
+                  headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+                    'Access-Control-Allow-Headers': 'Content-Type',
+                  },
+                ));
+                
+                // Ensure path starts with /
+                if (!path.startsWith('/')) path = '/$path';
+                debugPrint('Downloading image: ${Constants.baseUrl}$path');
+                await dio.download(path, savePath);
+                
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Downloaded to $savePath')),
                 );
               } catch (e) {
+                debugPrint('Download image error: $e');
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Download failed: $e')),
+                  SnackBar(content: Text('Download failed: ${e.toString()}')),
                 );
               }
             },

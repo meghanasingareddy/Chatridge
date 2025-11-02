@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/message.dart';
@@ -137,5 +138,27 @@ class StorageService {
       'messageCount': _messageBox.length,
       'deviceCount': _deviceBox.length,
     };
+  }
+
+  // Theme mode operations
+  static const String themeModeKey = 'theme_mode';
+
+  static Future<void> saveThemeMode(ThemeMode mode) async {
+    await _prefs.setString(themeModeKey, mode.toString());
+  }
+
+  static ThemeMode? getThemeMode() {
+    final modeString = _prefs.getString(themeModeKey);
+    if (modeString == null) return null;
+    
+    switch (modeString) {
+      case 'ThemeMode.dark':
+        return ThemeMode.dark;
+      case 'ThemeMode.light':
+        return ThemeMode.light;
+      case 'ThemeMode.system':
+      default:
+        return ThemeMode.system;
+    }
   }
 }

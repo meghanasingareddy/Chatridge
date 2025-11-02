@@ -1,0 +1,1 @@
+﻿Place your app_icon.png (1024x1024) file here, then run: flutter pub get && flutter pub run flutter_launcher_icons

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/connectivity_provider.dart';
+import '../providers/device_provider.dart';
+import '../services/storage_service.dart';
 import '../widgets/message_item.dart';
 import '../widgets/device_list.dart';
 import '../widgets/input_area.dart';
@@ -65,7 +67,12 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Chatridge'),
+            Text(
+              _selectedTarget != null 
+                ? _selectedTarget! 
+                : 'Group Chat',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             Consumer<ConnectivityProvider>(
               builder: (context, connectivityProvider, child) {
                 return Text(
@@ -130,7 +137,17 @@ class _ChatScreenState extends State<ChatScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () {
-            Navigator.of(context).pop();
+            // Navigate to conversations screen instead of just popping
+            final username = StorageService.getUsername();
+            if (username != null) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const ConversationsScreen(),
+                ),
+              );
+            } else {
+              Navigator.of(context).pop();
+            }
           },
         ),
       ),
