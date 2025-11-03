@@ -166,33 +166,19 @@ class ApiService {
       // Detect MIME type from file extension (critical for web and proper file handling)
       final mimeType = _detectMimeType(filename);
       
-      // Read file bytes to ensure compatibility with all platforms (especially web)
-      final fileBytes = await file.readAsBytes();
-      
-      debugPrint('Upload file info: name=$filename, size=${fileBytes.length}, mimeType=$mimeType');
+      debugPrint('Upload file info: name=$filename, size=$fileSize, mimeType=$mimeType');
       
       // Create MultipartFile with proper MIME type for web compatibility
       MultipartFile multipartFile;
+      MediaType? contentType;
       if (mimeType != null) {
         final parts = mimeType.split('/');
         if (parts.length == 2) {
-          multipartFile = MultipartFile.fromBytes(
-            fileBytes,
-            filename: filename,
-            contentType: MediaType(parts[0], parts[1]),
-          );
-        } else {
-          multipartFile = MultipartFile.fromBytes(
-            fileBytes,
-            filename: filename,
-          );
+          contentType = MediaType(parts[0], parts[1]);
         }
-      } else {
-        multipartFile = MultipartFile.fromBytes(
-          fileBytes,
-          filename: filename,
-        );
       }
+      
+      multipartFile = MultipartFile(file.openRead(), fileSize, filename: filename, contentType: contentType);
       
       final formData = FormData.fromMap({
         'file': multipartFile,

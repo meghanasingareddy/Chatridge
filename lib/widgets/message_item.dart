@@ -167,20 +167,10 @@ class MessageItem extends StatelessWidget {
     final needsSlash = filename.startsWith('/');
     final clean = needsSlash ? filename.substring(1) : filename;
     
-    String sanitized = '';
-    for (int i = 0; i < clean.length; i++) {
-      final char = clean[i];
-      // Allow alphanumeric, dots, hyphens, underscores, and spaces
-      if ((char.codeUnitAt(0) >= 'a'.codeUnitAt(0) && char.codeUnitAt(0) <= 'z'.codeUnitAt(0)) ||
-          (char.codeUnitAt(0) >= 'A'.codeUnitAt(0) && char.codeUnitAt(0) <= 'Z'.codeUnitAt(0)) ||
-          (char.codeUnitAt(0) >= '0'.codeUnitAt(0) && char.codeUnitAt(0) <= '9'.codeUnitAt(0)) ||
-          char == '.' || char == '-' || char == '_' || char == ' ') {
-        sanitized += char;
-      } else {
-        // Replace invalid characters (comma, parentheses, etc.) with underscore
-        sanitized += '_';
-      }
-    }
+    // This regex replaces any character that is NOT a letter, number, space, dot, hyphen, or underscore.
+    // This should more accurately match the ESP32's sanitization logic.
+    // It handles characters like `|`, `(`, `)`, `,`, etc., by replacing them with `_`.
+    final sanitized = clean.replaceAll(RegExp(r'[^a-zA-Z0-9 ._-]'), '_');
     
     return needsSlash ? '/$sanitized' : sanitized;
   }
