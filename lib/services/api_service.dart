@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../models/device.dart';
@@ -162,14 +163,39 @@ class ApiService {
       final normalizedPath = file.path.replaceAll('\\', '/');
       final filename = normalizedPath.split('/').last;
       
-      // Read file bytes to ensure compatibility with all platforms
+      // Detect MIME type from file extension (critical for web and proper file handling)
+      final mimeType = _detectMimeType(filename);
+      
+      // Read file bytes to ensure compatibility with all platforms (especially web)
       final fileBytes = await file.readAsBytes();
       
-      final formData = FormData.fromMap({
-        'file': MultipartFile.fromBytes(
+      debugPrint('Upload file info: name=$filename, size=${fileBytes.length}, mimeType=$mimeType');
+      
+      // Create MultipartFile with proper MIME type for web compatibility
+      MultipartFile multipartFile;
+      if (mimeType != null) {
+        final parts = mimeType.split('/');
+        if (parts.length == 2) {
+          multipartFile = MultipartFile.fromBytes(
+            fileBytes,
+            filename: filename,
+            contentType: MediaType(parts[0], parts[1]),
+          );
+        } else {
+          multipartFile = MultipartFile.fromBytes(
+            fileBytes,
+            filename: filename,
+          );
+        }
+      } else {
+        multipartFile = MultipartFile.fromBytes(
           fileBytes,
           filename: filename,
-        ),
+        );
+      }
+      
+      final formData = FormData.fromMap({
+        'file': multipartFile,
         'username': username,
         if (target != null && target.isNotEmpty) 'target': target,
       });
@@ -351,5 +377,59 @@ class ApiService {
       _dio.close();
       _isInitialized = false;
     }
+  }
+
+  // Detect MIME type from filename extension
+  // Critical for web uploads and proper file handling on ESP32
+  String? _detectMimeType(String filename) {
+    final lowerFilename = filename.toLowerCase();
+    
+    // Images
+    if (lowerFilename.endsWith('.jpg') || lowerFilename.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (lowerFilename.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (lowerFilename.endsWith('.gif')) {
+      return 'image/gif';
+    }
+    if (lowerFilename.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    
+    // Documents
+    if (lowerFilename.endsWith('.pdf')) {
+      return 'application/pdf';
+    }
+    if (lowerFilename.endsWith('.doc')) {
+      return 'application/msword';
+    }
+    if (lowerFilename.endsWith('.docx')) {
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    if (lowerFilename.endsWith('.xls')) {
+      return 'application/vnd.ms-excel';
+    }
+    if (lowerFilename.endsWith('.xlsx')) {
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+    if (lowerFilename.endsWith('.ppt')) {
+      return 'application/vnd.ms-powerpoint';
+    }
+    if (lowerFilename.endsWith('.pptx')) {
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    }
+    
+    // Text files
+    if (lowerFilename.endsWith('.txt')) {
+      return 'text/plain';
+    }
+    if (lowerFilename.endsWith('.csv')) {
+      return 'text/csv';
+    }
+    
+    // Default - let ESP32 determine from extension
+    return null;
   }
 }

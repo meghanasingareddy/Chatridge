@@ -357,7 +357,18 @@ void handleSend() {
 
 // Sanitize filename for SPIFFS (remove invalid characters)
 // This ensures filenames are stored consistently and can be matched when requested
+// IMPORTANT: Preserves file extension so files can be opened correctly on Windows/PC
 String sanitizeFilename(String filename) {
+  // Extract file extension first to preserve it
+  String extension = "";
+  int lastDot = filename.lastIndexOf('.');
+  if (lastDot > 0 && lastDot < filename.length() - 1) {
+    // There's a dot and it's not the first or last character
+    extension = filename.substring(lastDot); // Include the dot, e.g., ".pdf"
+    filename = filename.substring(0, lastDot); // Get filename without extension
+  }
+  
+  // Sanitize the base filename
   String sanitized = "/";
   for (unsigned int i = 0; i < filename.length(); i++) {
     char c = filename.charAt(i);
@@ -371,6 +382,10 @@ String sanitizeFilename(String filename) {
       sanitized += '_';
     }
   }
+  
+  // Reattach extension
+  sanitized += extension;
+  
   return sanitized;
 }
 
@@ -591,10 +606,20 @@ void handleFileGet() {
   Serial.println("Serving file: " + filePath + " (" + String(f.size()) + " bytes)");
   
   String ct = detectContentType(filePath);
-  // Send CORS headers - streamFile needs headers sent first
+  
+  // Extract filename for Content-Disposition header
+  int lastSlashForName = filePath.lastIndexOf('/');
+  String displayFilename = (lastSlashForName >= 0) ? filePath.substring(lastSlashForName + 1) : filePath;
+  
+  // Send headers - CORS and Content-Disposition for proper file handling
   server.sendHeader("Access-Control-Allow-Origin", "*");
   server.sendHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   server.sendHeader("Access-Control-Allow-Headers", "Content-Type");
+  // Content-Disposition ensures browsers download/save file with correct name
+  server.sendHeader("Content-Disposition", "inline; filename=\"" + displayFilename + "\"");
+  // Content-Type helps browsers/open appropriate applications
+  server.sendHeader("Content-Type", ct);
+  
   // Use streamFile which properly handles chunked transfer
   server.streamFile(f, ct);
   f.close();

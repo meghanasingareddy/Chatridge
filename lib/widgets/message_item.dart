@@ -445,8 +445,32 @@ class MessageItem extends StatelessWidget {
         fileName = pathParts.isNotEmpty ? pathParts.last : 'file';
       }
       
+      // Preserve file extension - extract it first
+      String fileExtension = '';
+      final extMatch = RegExp(r'\.([^.]+)$').firstMatch(fileName);
+      if (extMatch != null) {
+        fileExtension = extMatch.group(1) ?? '';
+      }
+      
       // Sanitize filename for local filesystem (remove invalid Windows chars)
-      fileName = fileName.replaceAll(RegExp(r'[<>:"|?*]'), '_');
+      // Keep the extension safe
+      String baseName = fileName;
+      if (fileExtension.isNotEmpty) {
+        baseName = fileName.substring(0, fileName.length - fileExtension.length - 1);
+      }
+      
+      // Remove invalid Windows characters but keep spaces (they're fine in Windows)
+      baseName = baseName.replaceAll(RegExp(r'[<>:"|?*]'), '_');
+      // Also remove backslashes and forward slashes
+      baseName = baseName.replaceAll(RegExp(r'[/\\]'), '_');
+      
+      // Reconstruct filename with extension
+      fileName = fileExtension.isNotEmpty ? '$baseName.$fileExtension' : baseName;
+      
+      // Ensure filename is not empty
+      if (fileName.isEmpty || fileName == '.') {
+        fileName = 'file${fileExtension.isNotEmpty ? '.$fileExtension' : ''}';
+      }
       
       final savePath = Platform.isWindows 
           ? '$dir\\$fileName' 
@@ -594,9 +618,9 @@ class MessageItem extends StatelessWidget {
       bool openedSuccessfully = false;
       
       if (Platform.isWindows) {
-        // Method 1: Try Windows start command with proper path handling
+        // Method 1: Use url_launcher with file URI (most reliable for Windows)
         try {
-          // Ensure Windows path format
+          // Normalize path to Windows format
           final normalizedPath = savePath.replaceAll('/', '\\');
           
           // Verify file exists before trying to open
@@ -605,18 +629,17 @@ class MessageItem extends StatelessWidget {
             throw Exception('File not found: $normalizedPath');
           }
           
-          // Use start command - the "" is for window title, path must be properly quoted
-          await Process.run(
-            'cmd',
-            ['/c', 'start', '""', normalizedPath],
-            runInShell: true,
-          );
-          
-          // Start command returns immediately, assume success if no exception
-          openedSuccessfully = true;
-          debugPrint('File opened using Windows start command: $normalizedPath');
+          // Use file URI - Windows handles this natively
+          final fileUri = Uri.file(normalizedPath);
+          if (await canLaunchUrl(fileUri)) {
+            await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+            openedSuccessfully = true;
+            debugPrint('File opened using url_launcher: $normalizedPath');
+          } else {
+            throw Exception('Cannot launch file URI');
+          }
         } catch (e) {
-          debugPrint('Windows start command failed: $e');
+          debugPrint('url_launcher failed: $e');
           
           // Method 2: Try open_file package
           try {
@@ -625,20 +648,40 @@ class MessageItem extends StatelessWidget {
             if (result.type == ResultType.done) {
               openedSuccessfully = true;
               debugPrint('File opened using OpenFile package');
-            } else {
-              // If open_file says no app, try url_launcher
-              if (result.type == ResultType.noAppToOpen) {
-                final normalizedPath = savePath.replaceAll('/', '\\');
-                final fileUri = Uri.file(normalizedPath);
-                if (await canLaunchUrl(fileUri)) {
-                  await launchUrl(fileUri, mode: LaunchMode.externalApplication);
-                  openedSuccessfully = true;
-                  debugPrint('File opened using url_launcher');
-                }
-              }
+            } else if (result.type == ResultType.noAppToOpen) {
+              // If no app found, show message with file location
+              debugPrint('No app found to open file');
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('No application found to open this file type. File saved to: $savePath'),
+                  duration: const Duration(seconds: 5),
+                ),
+              );
+              return; // Don't try other methods if no app available
             }
           } catch (e2) {
             debugPrint('OpenFile package failed: $e2');
+            
+            // Method 3: Try Windows explorer to show file location
+            try {
+              final normalizedPath = savePath.replaceAll('/', '\\');
+              final directory = normalizedPath.substring(0, normalizedPath.lastIndexOf('\\'));
+              final fileUri = Uri.file(directory);
+              if (await canLaunchUrl(fileUri)) {
+                await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('File saved. Opening folder: $directory'),
+                    duration: const Duration(seconds: 3),
+                  ),
+                );
+                return;
+              }
+            } catch (e3) {
+              debugPrint('Failed to open folder: $e3');
+            }
           }
         }
       } else {
@@ -657,10 +700,26 @@ class MessageItem extends StatelessWidget {
       // Only show error if all methods failed
       if (!openedSuccessfully) {
         if (!context.mounted) return;
+        // Show file location clearly so user can manually open it
+        final normalizedPath = savePath.replaceAll('/', '\\');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Cannot open file. File saved to: $savePath'),
-            duration: const Duration(seconds: 5),
+            content: Text('File saved to:\n$normalizedPath'),
+            duration: const Duration(seconds: 8),
+            action: SnackBarAction(
+              label: 'Open Folder',
+              onPressed: () async {
+                try {
+                  final directory = normalizedPath.substring(0, normalizedPath.lastIndexOf('\\'));
+                  final fileUri = Uri.file(directory);
+                  if (await canLaunchUrl(fileUri)) {
+                    await launchUrl(fileUri, mode: LaunchMode.externalApplication);
+                  }
+                } catch (e) {
+                  debugPrint('Failed to open folder: $e');
+                }
+              },
+            ),
           ),
         );
       }
