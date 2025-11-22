@@ -80,20 +80,32 @@ class CloudFileService {
         onSendProgress: onProgress,
       );
 
-      if (response.statusCode == 200) {
-        // 0x0.st returns the URL directly as text
-        String? url = response.data.toString().trim();
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // 0x0.st returns the URL directly as text/plain
+        String? url;
+        if (response.data is String) {
+          url = (response.data as String).trim();
+        } else {
+          url = response.data.toString().trim();
+        }
+        
+        // Remove any quotes or whitespace
+        url = url.replaceAll('"', '').replaceAll("'", '').trim();
         
         // Ensure it's a full URL
-        if (!url.startsWith('http')) {
-          url = '$_cloudBaseUrl$url';
+        if (url.isNotEmpty && !url.startsWith('http://') && !url.startsWith('https://')) {
+          if (url.startsWith('/')) {
+            url = '$_cloudBaseUrl$url';
+          } else {
+            url = '$_cloudBaseUrl/$url';
+          }
+        }
+        
+        if (url.isEmpty) {
+          throw Exception('Cloud service returned empty URL');
         }
         
         debugPrint('CloudFileService: Upload successful, URL: $url');
-        
-        // Store metadata with the URL for later retrieval
-        // We'll encode username and target in a comment or use a different approach
-        // For now, just return the URL - the app will handle it
         return url;
       } else {
         throw Exception('Cloud upload failed with status: ${response.statusCode}');
