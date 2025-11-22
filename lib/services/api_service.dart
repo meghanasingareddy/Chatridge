@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:http_parser/http_parser.dart';
 import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../models/device.dart';
@@ -22,11 +23,8 @@ class ApiService {
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         sendTimeout: const Duration(seconds: 10),
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
+        // Don't set CORS headers in request - these are response headers from server
+        // Mobile clients don't need these in request headers
       ),
     );
 
@@ -160,11 +158,30 @@ class ApiService {
             'File too large: ${(fileSize / 1024 / 1024).toStringAsFixed(1)}MB (max: ${Constants.maxFileSizeMB}MB)',);
       }
 
+      // Handle Windows paths (backslashes) and Unix paths (forward slashes)
+      // Normalize the file path for cross-platform compatibility
+      final normalizedPath = file.path.replaceAll('\\', '/');
+      final filename = normalizedPath.split('/').last;
+      
+      // Detect MIME type from file extension (critical for web and proper file handling)
+      final mimeType = _detectMimeType(filename);
+      
+      debugPrint('Upload file info: name=$filename, size=$fileSize, mimeType=$mimeType');
+      
+      // Create MultipartFile with proper MIME type for web compatibility
+      MultipartFile multipartFile;
+      MediaType? contentType;
+      if (mimeType != null) {
+        final parts = mimeType.split('/');
+        if (parts.length == 2) {
+          contentType = MediaType(parts[0], parts[1]);
+        }
+      }
+      
+      multipartFile = MultipartFile(file.openRead(), fileSize, filename: filename, contentType: contentType);
+      
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(
-          file.path,
-          filename: file.path.split('/').last,
-        ),
+        'file': multipartFile,
         'username': username,
         if (target != null && target.isNotEmpty) 'target': target,
       });
@@ -178,11 +195,7 @@ class ApiService {
           connectTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 60),
           sendTimeout: const Duration(seconds: 60),
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-          },
+          // Don't set CORS headers in request - these are response headers from server
         ),
       );
 
@@ -350,5 +363,59 @@ class ApiService {
       _dio.close();
       _isInitialized = false;
     }
+  }
+
+  // Detect MIME type from filename extension
+  // Critical for web uploads and proper file handling on ESP32
+  String? _detectMimeType(String filename) {
+    final lowerFilename = filename.toLowerCase();
+    
+    // Images
+    if (lowerFilename.endsWith('.jpg') || lowerFilename.endsWith('.jpeg')) {
+      return 'image/jpeg';
+    }
+    if (lowerFilename.endsWith('.png')) {
+      return 'image/png';
+    }
+    if (lowerFilename.endsWith('.gif')) {
+      return 'image/gif';
+    }
+    if (lowerFilename.endsWith('.webp')) {
+      return 'image/webp';
+    }
+    
+    // Documents
+    if (lowerFilename.endsWith('.pdf')) {
+      return 'application/pdf';
+    }
+    if (lowerFilename.endsWith('.doc')) {
+      return 'application/msword';
+    }
+    if (lowerFilename.endsWith('.docx')) {
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+    if (lowerFilename.endsWith('.xls')) {
+      return 'application/vnd.ms-excel';
+    }
+    if (lowerFilename.endsWith('.xlsx')) {
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+    if (lowerFilename.endsWith('.ppt')) {
+      return 'application/vnd.ms-powerpoint';
+    }
+    if (lowerFilename.endsWith('.pptx')) {
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    }
+    
+    // Text files
+    if (lowerFilename.endsWith('.txt')) {
+      return 'text/plain';
+    }
+    if (lowerFilename.endsWith('.csv')) {
+      return 'text/csv';
+    }
+    
+    // Default - let ESP32 determine from extension
+    return null;
   }
 }

@@ -5,6 +5,7 @@ import '../services/api_service.dart';
 import '../services/storage_service.dart';
 import '../utils/helpers.dart';
 import 'chat_screen.dart';
+import 'conversations_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -64,7 +65,7 @@ class _LoginScreenState extends State<LoginScreen> {
         // Navigate to chat screen
         if (mounted) {
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const ChatScreen()),
+            MaterialPageRoute(builder: (context) => const ConversationsScreen()),
           );
         }
       } else {

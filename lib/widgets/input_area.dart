@@ -228,12 +228,15 @@ class _InputAreaState extends State<InputArea> {
   Widget build(BuildContext context) {
     final isConnected =
         context.watch<ConnectivityProvider>().isConnectedToChatridge;
+    final theme = Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.scaffoldBackgroundColor,
         border: Border(
-          top: BorderSide(color: Colors.grey.shade300),
+          top: BorderSide(
+            color: theme.dividerColor,
+          ),
         ),
       ),
       child: Column(
@@ -243,9 +246,9 @@ class _InputAreaState extends State<InputArea> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: theme.colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: theme.colorScheme.primary.withOpacity(0.3)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -253,13 +256,13 @@ class _InputAreaState extends State<InputArea> {
                   Icon(
                     Icons.person,
                     size: 16,
-                    color: Colors.blue.shade700,
+                    color: theme.colorScheme.primary,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     'To: ${widget.selectedTarget}',
                     style: TextStyle(
-                      color: Colors.blue.shade700,
+                      color: theme.colorScheme.primary,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -270,7 +273,7 @@ class _InputAreaState extends State<InputArea> {
                     child: Icon(
                       Icons.close,
                       size: 16,
-                      color: Colors.blue.shade700,
+                      color: theme.colorScheme.primary,
                     ),
                   ),
                 ],
@@ -286,7 +289,7 @@ class _InputAreaState extends State<InputArea> {
               IconButton(
                 icon: const Icon(Icons.attach_file),
                 onPressed: _isSending || !isConnected ? null : _showFileOptions,
-                color: Colors.grey.shade600,
+                color: theme.iconTheme.color,
               ),
 
               // Message input
@@ -315,8 +318,8 @@ class _InputAreaState extends State<InputArea> {
               DecoratedBox(
                 decoration: BoxDecoration(
                   color: _isSending || !isConnected
-                      ? Colors.grey
-                      : const Color(0xFF3498DB),
+                      ? theme.disabledColor
+                      : theme.colorScheme.primary,
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(

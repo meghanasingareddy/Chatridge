@@ -42,6 +42,7 @@ class Constants {
   static const String deviceNameKey = 'device_name';
   static const String autoPollingKey = 'auto_polling';
   static const String pollingIntervalKey = 'polling_interval';
+  static const String downloadPathKey = 'download_path';
 
   // UI Constants
   static const double borderRadius = 8.0;

@@ -1,5 +1,8 @@
+import 'dart:io';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:path_provider/path_provider.dart';
 import '../models/message.dart';
 import '../models/device.dart';
 import '../utils/constants.dart';
@@ -137,5 +140,88 @@ class StorageService {
       'messageCount': _messageBox.length,
       'deviceCount': _deviceBox.length,
     };
+  }
+
+  // Theme mode operations
+  static const String themeModeKey = 'theme_mode';
+
+  static Future<void> saveThemeMode(ThemeMode mode) async {
+    await _prefs.setString(themeModeKey, mode.toString());
+  }
+
+  static ThemeMode? getThemeMode() {
+    final modeString = _prefs.getString(themeModeKey);
+    if (modeString == null) return null;
+    
+    switch (modeString) {
+      case 'ThemeMode.dark':
+        return ThemeMode.dark;
+      case 'ThemeMode.light':
+        return ThemeMode.light;
+      case 'ThemeMode.system':
+      default:
+        return ThemeMode.system;
+    }
+  }
+
+  // Download path operations
+  static Future<void> saveDownloadPath(String? path) async {
+    if (path == null || path.isEmpty) {
+      await _prefs.remove(Constants.downloadPathKey);
+    } else {
+      await _prefs.setString(Constants.downloadPathKey, path);
+    }
+  }
+
+  static String? getDownloadPath() {
+    return _prefs.getString(Constants.downloadPathKey);
+  }
+
+  // Get default download directory
+  static Future<String> getDefaultDownloadDirectory() async {
+    if (Platform.isWindows) {
+      // Try to get Downloads folder, fallback to Documents
+      final userProfile = Platform.environment['USERPROFILE'];
+      if (userProfile != null) {
+        final downloadsPath = '$userProfile\\Downloads';
+        if (Directory(downloadsPath).existsSync()) {
+          return downloadsPath;
+        }
+      }
+      // Fallback to Documents
+      final documentsDir = await getApplicationDocumentsDirectory();
+      return documentsDir.path;
+    } else if (Platform.isAndroid) {
+      // Android - use app's external storage Downloads
+      final dir = await getExternalStorageDirectory();
+      if (dir != null) {
+        final downloadsDir = Directory('${dir.path}/Downloads');
+        if (!downloadsDir.existsSync()) {
+          downloadsDir.createSync(recursive: true);
+        }
+        return downloadsDir.path;
+      }
+      // Fallback
+      final documentsDir = await getApplicationDocumentsDirectory();
+      return documentsDir.path;
+    } else {
+      // iOS, macOS, Linux - use documents directory
+      final documentsDir = await getApplicationDocumentsDirectory();
+      return documentsDir.path;
+    }
+  }
+
+  // Get current download directory (custom or default)
+  static Future<String> getDownloadDirectory() async {
+    final customPath = getDownloadPath();
+    if (customPath != null && customPath.isNotEmpty) {
+      // Verify directory exists
+      final dir = Directory(customPath);
+      if (dir.existsSync()) {
+        return customPath;
+      }
+    }
+    // Use default if custom path doesn't exist
+    return await getDefaultDownloadDirectory();
   }
 }

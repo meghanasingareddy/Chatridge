@@ -178,4 +178,38 @@ class Helpers {
     }
     return username.substring(0, 2).toUpperCase();
   }
+
+  // Check if text contains URL
+  static bool containsUrl(String text) {
+    final urlPattern = RegExp(
+      r'https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*',
+      caseSensitive: false,
+    );
+    return urlPattern.hasMatch(text);
+  }
+
+  // Extract URLs from text
+  static List<String> extractUrls(String text) {
+    final urlPattern = RegExp(
+      r'https?://[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,}[^\s]*',
+      caseSensitive: false,
+    );
+    final matches = urlPattern.allMatches(text);
+    return matches.map((match) {
+      String url = match.group(0)!;
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        url = 'https://$url';
+      }
+      return url;
+    }).toList();
+  }
+
+  // Check if string is a valid URL
+  static bool isValidUrl(String url) {
+    final urlPattern = RegExp(
+      r'^https?://[^\s/$.?#].[^\s]*$',
+      caseSensitive: false,
+    );
+    return urlPattern.hasMatch(url);
+  }
 }

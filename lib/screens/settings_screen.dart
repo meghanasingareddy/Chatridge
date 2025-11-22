@@ -1,6 +1,10 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:file_picker/file_picker.dart';
 import '../providers/chat_provider.dart';
+import '../providers/device_provider.dart';
+import '../providers/theme_provider.dart';
 import '../services/storage_service.dart';
 import '../utils/helpers.dart';
 
@@ -15,6 +19,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _username;
   String? _deviceName;
   int _pollingInterval = 2;
+  ThemeMode? _themeMode;
+  String? _downloadPath;
 
   @override
   void initState() {
@@ -26,12 +32,86 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final username = StorageService.getUsername();
     final deviceName = StorageService.getDeviceName();
     final pollingInterval = StorageService.getPollingInterval();
+    final themeMode = StorageService.getThemeMode() ?? ThemeMode.system;
+    final downloadPath = StorageService.getDownloadPath();
+    final defaultPath = await StorageService.getDefaultDownloadDirectory();
 
     setState(() {
       _username = username;
       _deviceName = deviceName;
       _pollingInterval = pollingInterval;
+      _themeMode = themeMode;
+      _downloadPath = downloadPath ?? defaultPath;
     });
+  }
+
+  Future<void> _pickDownloadFolder() async {
+    String? selectedDirectory;
+    
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      // Desktop platforms - use file_picker to select directory
+      selectedDirectory = await FilePicker.platform.getDirectoryPath();
+    } else {
+      // Mobile platforms - show dialog with options
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Download Location'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Choose download location:'),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.folder),
+                title: const Text('Default (Downloads)'),
+                onTap: () => Navigator.of(context).pop('default'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder_special),
+                title: const Text('Documents'),
+                onTap: () => Navigator.of(context).pop('documents'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+      
+      if (result == 'default') {
+        selectedDirectory = await StorageService.getDefaultDownloadDirectory();
+      } else if (result == 'documents') {
+        // Use documents directory
+        final dir = await StorageService.getDefaultDownloadDirectory();
+        selectedDirectory = dir; // This already defaults to appropriate location
+      }
+    }
+
+    if (selectedDirectory != null && selectedDirectory.isNotEmpty) {
+      await StorageService.saveDownloadPath(selectedDirectory);
+      setState(() {
+        _downloadPath = selectedDirectory;
+      });
+      if (mounted) {
+        Helpers.showSnackBar(context, 'Download location updated');
+      }
+    }
+  }
+
+  Future<void> _resetDownloadPath() async {
+    await StorageService.saveDownloadPath(null);
+    final defaultPath = await StorageService.getDefaultDownloadDirectory();
+    setState(() {
+      _downloadPath = defaultPath;
+    });
+    if (mounted) {
+      Helpers.showSnackBar(context, 'Download location reset to default');
+    }
   }
 
   void _showChangeUsernameDialog() {
@@ -160,19 +240,117 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  void _clearLocalCache() async {
+    final confirmed = await Helpers.showConfirmationDialog(
+      context,
+      'Clear Local Cache',
+      'This will clear all cached messages and devices from your device. '
+      'Messages will be re-fetched from the ESP32 server when you reconnect.\n\n'
+      'Continue?',
+    );
+
+    if (confirmed) {
+      await context.read<ChatProvider>().clearMessages();
+      await context.read<DeviceProvider>().clearDevices();
+      // Refresh to get data from server
+      await context.read<ChatProvider>().fetchMessages();
+      await context.read<DeviceProvider>().fetchDevices();
+      Helpers.showSnackBar(context, 'Local cache cleared');
+    }
+  }
+
+  void _showThemeDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Choose Theme'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            RadioListTile<ThemeMode>(
+              title: const Text('System Default'),
+              subtitle: const Text('Follow device theme'),
+              value: ThemeMode.system,
+              groupValue: _themeMode,
+              onChanged: (value) {
+                if (value != null) {
+                  context.read<ThemeProvider>().setThemeMode(value);
+                  setState(() {
+                    _themeMode = value;
+                  });
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Light'),
+              subtitle: const Text('Always use light theme'),
+              value: ThemeMode.light,
+              groupValue: _themeMode,
+              onChanged: (value) {
+                if (value != null) {
+                  context.read<ThemeProvider>().setThemeMode(value);
+                  setState(() {
+                    _themeMode = value;
+                  });
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+            RadioListTile<ThemeMode>(
+              title: const Text('Dark'),
+              subtitle: const Text('Always use dark theme'),
+              value: ThemeMode.dark,
+              groupValue: _themeMode,
+              onChanged: (value) {
+                if (value != null) {
+                  context.read<ThemeProvider>().setThemeMode(value);
+                  setState(() {
+                    _themeMode = value;
+                  });
+                  Navigator.of(context).pop();
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getThemeModeText(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return 'Light';
+      case ThemeMode.dark:
+        return 'Dark';
+      case ThemeMode.system:
+      default:
+        return 'System Default';
+    }
+  }
+
   void _clearAllData() async {
     final confirmed = await Helpers.showConfirmationDialog(
       context,
       'Clear All Data',
-      'Are you sure you want to clear all data? This will log you out and clear all messages and settings.',
+      'This will permanently delete all local data including:\n'
+      '• All cached messages\n'
+      '• All device information\n'
+      '• Your username and device name\n'
+      '• All app settings\n\n'
+      'You will be logged out and need to register again.\n\n'
+      'Continue?',
     );
 
     if (confirmed) {
       await StorageService.clearAllData();
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/',
-        (route) => false,
-      );
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/',
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -213,6 +391,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: Text(_deviceName ?? 'Not set'),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: _showChangeDeviceNameDialog,
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Appearance Section
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Appearance',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  ListTile(
+                    leading: const Icon(Icons.brightness_6),
+                    title: const Text('Theme'),
+                    subtitle: Text(_getThemeModeText(_themeMode ?? ThemeMode.system)),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: _showThemeDialog,
                   ),
                 ],
               ),
@@ -263,6 +470,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const SizedBox(height: 16),
 
+          // File Settings Section
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'File Settings',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  FutureBuilder<String>(
+                    future: StorageService.getDownloadDirectory(),
+                    builder: (context, snapshot) {
+                      final displayPath = snapshot.data ?? _downloadPath ?? 'Loading...';
+                      return ListTile(
+                        leading: const Icon(Icons.download),
+                        title: const Text('Download Location'),
+                        subtitle: Text(
+                          displayPath,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: const Icon(Icons.arrow_forward_ios),
+                        onTap: _pickDownloadFolder,
+                      );
+                    },
+                  ),
+                  FutureBuilder<String>(
+                    future: StorageService.getDefaultDownloadDirectory(),
+                    builder: (context, snapshot) {
+                      final defaultPath = snapshot.data ?? '';
+                      if (_downloadPath != null && _downloadPath != defaultPath) {
+                        return ListTile(
+                          leading: const Icon(Icons.refresh),
+                          title: const Text('Reset to Default'),
+                          subtitle: const Text('Use default download location'),
+                          trailing: const Icon(Icons.arrow_forward_ios),
+                          onTap: _resetDownloadPath,
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
           // Data Management Section
           Card(
             child: Padding(
@@ -278,18 +540,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
+                  Consumer<ChatProvider>(
+                    builder: (context, chatProvider, child) {
+                      final storageInfo = StorageService.getStorageInfo();
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(Icons.storage),
+                            title: const Text('Storage Information'),
+                            subtitle: Text(
+                              '${storageInfo['messageCount'] ?? 0} messages stored locally\n'
+                              '${storageInfo['deviceCount'] ?? 0} devices known',
+                            ),
+                          ),
+                          const Divider(),
+                        ],
+                      );
+                    },
+                  ),
                   ListTile(
                     leading: const Icon(Icons.delete_outline),
                     title: const Text('Clear Message History'),
-                    subtitle:
-                        const Text('Remove all messages from local storage'),
+                    subtitle: const Text(
+                      'Remove all messages from local device storage\n'
+                      'Note: Messages on ESP32 server remain',
+                    ),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: _clearMessageHistory,
                   ),
                   ListTile(
+                    leading: const Icon(Icons.delete_sweep),
+                    title: const Text('Clear Local Cache'),
+                    subtitle: const Text(
+                      'Clear all cached messages and devices\n'
+                      'Data will be re-fetched from ESP32 server',
+                    ),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                    onTap: _clearLocalCache,
+                  ),
+                  ListTile(
                     leading: const Icon(Icons.delete_forever),
                     title: const Text('Clear All Data'),
-                    subtitle: const Text('Remove all data and log out'),
+                    subtitle: const Text(
+                      'Remove all local data and log out\n'
+                      'This includes messages, devices, and settings',
+                    ),
                     trailing: const Icon(Icons.arrow_forward_ios),
                     onTap: _clearAllData,
                   ),

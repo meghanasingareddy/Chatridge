@@ -2,13 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../providers/connectivity_provider.dart';
+import '../providers/device_provider.dart';
+import '../services/storage_service.dart';
 import '../widgets/message_item.dart';
 import '../widgets/device_list.dart';
 import '../widgets/input_area.dart';
 import 'settings_screen.dart';
+import 'conversations_screen.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? initialTarget;
+  
+  const ChatScreen({super.key, this.initialTarget});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -22,6 +27,7 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedTarget = widget.initialTarget;
     _scrollToBottom();
   }
 
@@ -61,7 +67,12 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Chatridge'),
+            Text(
+              _selectedTarget != null 
+                ? _selectedTarget! 
+                : 'Group Chat',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             Consumer<ConnectivityProvider>(
               builder: (context, connectivityProvider, child) {
                 return Text(
@@ -76,6 +87,58 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          // WiFi Test Connection Button
+          Consumer<ConnectivityProvider>(
+            builder: (context, connectivityProvider, child) {
+              return IconButton(
+                icon: const Icon(Icons.wifi_find),
+                onPressed: () async {
+                  await connectivityProvider.refreshConnectivity();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          connectivityProvider.isConnectedToChatridge
+                              ? 'Successfully connected to Chatridge!'
+                              : 'Could not connect to Chatridge server. Please check your WiFi connection.',
+                        ),
+                        backgroundColor:
+                            connectivityProvider.isConnectedToChatridge
+                                ? Colors.green
+                                : Colors.orange,
+                        duration: const Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                },
+                tooltip: 'Test WiFi Connection',
+              );
+            },
+          ),
+          // Refresh Button
+          Consumer<ChatProvider>(
+            builder: (context, chatProvider, child) {
+              return IconButton(
+                icon: chatProvider.isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.refresh),
+                onPressed: chatProvider.isLoading
+                    ? null
+                    : () async {
+                        await chatProvider.fetchMessages();
+                        await context.read<DeviceProvider>().fetchDevices();
+                      },
+                tooltip: 'Refresh messages',
+              );
+            },
+          ),
           // Device List Toggle
           IconButton(
             icon: const Icon(Icons.people),
@@ -84,6 +147,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 _showDevices = !_showDevices;
               });
             },
+            tooltip: 'Show devices',
           ),
           // Settings
           IconButton(
@@ -95,8 +159,25 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               );
             },
+            tooltip: 'Settings',
           ),
         ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            // Navigate to conversations screen instead of just popping
+            final username = StorageService.getUsername();
+            if (username != null) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const ConversationsScreen(),
+                ),
+              );
+            } else {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
       ),
       body: Column(
         children: [
