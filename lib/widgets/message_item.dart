@@ -12,6 +12,8 @@ import '../utils/helpers.dart';
 import '../screens/image_viewer_screen.dart';
 import '../utils/constants.dart';
 import '../services/storage_service.dart';
+import '../services/api_service.dart';
+import '../services/cloud_file_service.dart';
 
 class MessageItem extends StatelessWidget {
   const MessageItem({
@@ -230,22 +232,12 @@ class MessageItem extends StatelessWidget {
 
   Future<void> _downloadAttachment(BuildContext context) async {
     try {
-      final filePath = _resolvedUrl();
-      if (filePath.isEmpty) throw Exception('Missing file path');
+      final attachmentUrl = message.attachmentUrl;
+      if (attachmentUrl == null || attachmentUrl.isEmpty) {
+        throw Exception('Missing file URL');
+      }
       
-      debugPrint('Downloading attachment: original URL=${message.attachmentUrl}, resolved=$filePath');
-      
-      // Create properly configured Dio instance with baseUrl
-      final dio = Dio(BaseOptions(
-        baseUrl: Constants.baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 60),
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      ));
+      debugPrint('Downloading attachment: URL=$attachmentUrl');
       
       // Get download directory (custom or default)
       final dir = await StorageService.getDownloadDirectory();
@@ -254,11 +246,20 @@ class MessageItem extends StatelessWidget {
         downloadDir.createSync(recursive: true);
       }
       
-      // Use attachment name, fallback to filename from URL (sanitized)
+      // Use attachment name, fallback to filename from URL
       String filename = message.attachmentName ?? 'file';
       if (filename.isEmpty) {
-        final pathParts = filePath.split('/');
-        filename = pathParts.isNotEmpty ? pathParts.last : 'file';
+        // Extract filename from URL
+        final uri = Uri.tryParse(attachmentUrl);
+        if (uri != null) {
+          final pathSegments = uri.pathSegments;
+          if (pathSegments.isNotEmpty) {
+            filename = pathSegments.last;
+          }
+        }
+        if (filename.isEmpty) {
+          filename = 'file';
+        }
       }
       
       // Sanitize filename for local filesystem (remove invalid Windows chars)
@@ -268,38 +269,9 @@ class MessageItem extends StatelessWidget {
           ? '$dir\\$filename' 
           : '$dir/$filename';
       
-      // Normalize path - ensure it starts with / and doesn't have double slashes
-      String path = filePath.startsWith('/') ? filePath : '/$filePath';
-      path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
-      
-      // URL encode the path to handle special characters (spaces, etc.)
-      // Split path into parts and encode each part separately
-      final pathParts = path.split('/');
-      final encodedParts = pathParts.map((part) {
-        if (part.isEmpty) return part;
-        return Uri.encodeComponent(part);
-      }).toList();
-      final encodedPath = encodedParts.join('/');
-      
-      debugPrint('Downloading file: ${Constants.baseUrl}$encodedPath -> $savePath');
-      debugPrint('Original path: $path, Encoded path: $encodedPath');
-      
-      try {
-        await dio.download(encodedPath, savePath);
-        debugPrint('File downloaded successfully: $savePath');
-      } on DioException catch (e) {
-        debugPrint('Download error: ${e.message}');
-        debugPrint('Response: ${e.response?.data}');
-        debugPrint('Status code: ${e.response?.statusCode}');
-        
-        if (e.response?.statusCode == 404) {
-          throw Exception('File not found on server. Path: $path');
-        } else if (e.response?.statusCode == 500) {
-          throw Exception('Server error while downloading file');
-        } else {
-          throw Exception('Failed to download file: ${e.message}');
-        }
-      }
+      // Use API service for download (handles both ESP32 and cloud)
+      final apiService = ApiService();
+      await apiService.downloadFile(attachmentUrl, savePath);
       
       // Verify file was downloaded
       final downloadedFile = File(savePath);
@@ -328,22 +300,12 @@ class MessageItem extends StatelessWidget {
 
   Future<void> _shareAttachment(BuildContext context) async {
     try {
-      final filePath = _resolvedUrl();
-      if (filePath.isEmpty) throw Exception('Missing file path');
+      final attachmentUrl = message.attachmentUrl;
+      if (attachmentUrl == null || attachmentUrl.isEmpty) {
+        throw Exception('Missing file URL');
+      }
       
-      // Create properly configured Dio instance with baseUrl
-      final dio = Dio(BaseOptions(
-        baseUrl: Constants.baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 60),
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      ));
-      
-      // Use download directory for shared files too
+      // Use download directory for shared files
       final dir = await StorageService.getDownloadDirectory();
       final downloadDir = Directory(dir);
       if (!downloadDir.existsSync()) {
@@ -352,8 +314,16 @@ class MessageItem extends StatelessWidget {
       
       String filename = message.attachmentName ?? 'file';
       if (filename.isEmpty) {
-        final pathParts = filePath.split('/');
-        filename = pathParts.isNotEmpty ? pathParts.last : 'file';
+        final uri = Uri.tryParse(attachmentUrl);
+        if (uri != null) {
+          final pathSegments = uri.pathSegments;
+          if (pathSegments.isNotEmpty) {
+            filename = pathSegments.last;
+          }
+        }
+        if (filename.isEmpty) {
+          filename = 'file';
+        }
       }
       
       // Sanitize filename for local filesystem
@@ -362,21 +332,9 @@ class MessageItem extends StatelessWidget {
           ? '$dir\\$filename' 
           : '$dir/$filename';
       
-      // Normalize path - ensure it starts with / and doesn't have double slashes
-      String path = filePath.startsWith('/') ? filePath : '/$filePath';
-      path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
-      
-      // URL encode the path to handle special characters
-      final pathParts = path.split('/');
-      final encodedParts = pathParts.map((part) {
-        if (part.isEmpty) return part;
-        return Uri.encodeComponent(part);
-      }).toList();
-      final encodedPath = encodedParts.join('/');
-      
-      debugPrint('Downloading file for share: ${Constants.baseUrl}$encodedPath');
-      debugPrint('Original path: $path, Encoded path: $encodedPath');
-      await dio.download(encodedPath, savePath);
+      // Use API service for download (handles both ESP32 and cloud)
+      final apiService = ApiService();
+      await apiService.downloadFile(attachmentUrl, savePath);
       
       if (!context.mounted) return;
       
@@ -396,43 +354,37 @@ class MessageItem extends StatelessWidget {
 
   Future<void> _openDocument(BuildContext context) async {
     try {
-      final filePath = _resolvedUrl();
-      if (filePath.isEmpty) {
+      final attachmentUrl = message.attachmentUrl;
+      if (attachmentUrl == null || attachmentUrl.isEmpty) {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Missing file path')),
+          const SnackBar(content: Text('Missing file URL')),
         );
         return;
       }
       
-      debugPrint('Opening document: original URL=${message.attachmentUrl}, resolved=$filePath');
-      
-      // Create properly configured Dio instance with baseUrl
-      final dio = Dio(BaseOptions(
-        baseUrl: Constants.baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 60),
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      ));
+      debugPrint('Opening document: URL=$attachmentUrl');
       
       // Get download directory (custom or default) for opening files
-      // We use download directory so files can be opened after download
       final dir = await StorageService.getDownloadDirectory();
       final downloadDir = Directory(dir);
       if (!downloadDir.existsSync()) {
         downloadDir.createSync(recursive: true);
       }
       
-      // Use attachment name, fallback to filename from URL (use sanitized version)
+      // Use attachment name, fallback to filename from URL
       String fileName = message.attachmentName ?? 'file';
       if (fileName.isEmpty) {
-        // Extract filename from URL path
-        final pathParts = filePath.split('/');
-        fileName = pathParts.isNotEmpty ? pathParts.last : 'file';
+        final uri = Uri.tryParse(attachmentUrl);
+        if (uri != null) {
+          final pathSegments = uri.pathSegments;
+          if (pathSegments.isNotEmpty) {
+            fileName = pathSegments.last;
+          }
+        }
+        if (fileName.isEmpty) {
+          fileName = 'file';
+        }
       }
       
       // Preserve file extension - extract it first
@@ -443,15 +395,13 @@ class MessageItem extends StatelessWidget {
       }
       
       // Sanitize filename for local filesystem (remove invalid Windows chars)
-      // Keep the extension safe
       String baseName = fileName;
       if (fileExtension.isNotEmpty) {
         baseName = fileName.substring(0, fileName.length - fileExtension.length - 1);
       }
       
-      // Remove invalid Windows characters but keep spaces (they're fine in Windows)
+      // Remove invalid Windows characters but keep spaces
       baseName = baseName.replaceAll(RegExp(r'[<>:"|?*]'), '_');
-      // Also remove backslashes and forward slashes
       baseName = baseName.replaceAll(RegExp(r'[/\\]'), '_');
       
       // Reconstruct filename with extension
@@ -466,93 +416,18 @@ class MessageItem extends StatelessWidget {
           ? '$dir\\$fileName' 
           : '$dir/$fileName';
       
-      // Normalize path - ensure it starts with / and doesn't have double slashes
-      String path = filePath.startsWith('/') ? filePath : '/$filePath';
-      path = path.replaceAll(RegExp(r'//+'), '/'); // Remove double slashes
-      
-      // Try multiple path formats to handle different scenarios
-      final pathsToTry = <String>[];
-      
-      // 1. Sanitized path (what we expect from ESP32)
-      pathsToTry.add(path);
-      
-      // 2. If path has underscores that might have been spaces, try with original special chars
-      // But only if the original message URL had special chars
-      if (message.attachmentUrl != null && 
-          (message.attachmentUrl!.contains(',') || 
-           message.attachmentUrl!.contains('(') || 
-           message.attachmentUrl!.contains(')'))) {
-        // Try the original unsanitized path as fallback
-        final originalPath = message.attachmentUrl!.startsWith('/') 
-            ? message.attachmentUrl! 
-            : '/${message.attachmentUrl!}';
-        pathsToTry.add(originalPath);
-      }
-      
-      // Try each path format
-      bool downloadSuccess = false;
-      DioException? lastError;
-      
-      for (final tryPath in pathsToTry) {
-        // URL encode the path to handle special characters (spaces, etc.)
-        final pathParts = tryPath.split('/');
-        final encodedParts = pathParts.map((part) {
-          if (part.isEmpty) return part;
-          return Uri.encodeComponent(part);
-        }).toList();
-        final encodedPath = encodedParts.join('/');
-        
-        debugPrint('Trying to download: ${Constants.baseUrl}$encodedPath -> $savePath');
-        
-        try {
-          await dio.download(encodedPath, savePath);
-          final downloadedFile = File(savePath);
-          if (await downloadedFile.exists() && await downloadedFile.length() > 0) {
-            downloadSuccess = true;
-            debugPrint('File downloaded successfully: $savePath');
-            break;
-          }
-        } on DioException catch (e) {
-          debugPrint('Download error for path $tryPath: ${e.message}');
-          debugPrint('Status code: ${e.response?.statusCode}');
-          lastError = e;
-          // Continue to try next path
-        } catch (e) {
-          debugPrint('Unexpected error: $e');
-          lastError = DioException(
-            requestOptions: RequestOptions(path: tryPath),
-            type: DioExceptionType.unknown,
-            error: e,
-          );
-        }
-      }
-      
-      if (!downloadSuccess) {
+      // Use API service for download (handles both ESP32 and cloud)
+      final apiService = ApiService();
+      try {
+        await apiService.downloadFile(attachmentUrl, savePath);
+      } catch (e) {
         if (!context.mounted) return;
         
-        // Show detailed error with all attempted paths
-        final originalUrl = message.attachmentUrl ?? 'null';
-        final resolvedUrl = filePath;
+        String errorMsg = '❌ File not found.\n\n';
+        errorMsg += '📁 URL: $attachmentUrl\n';
+        errorMsg += '⚠️ Error: ${e.toString()}\n\n';
+        errorMsg += '💡 Try re-uploading the file.';
         
-        String errorMsg = '❌ File not found on server.\n\n';
-        errorMsg += '📁 Original URL: $originalUrl\n';
-        errorMsg += '🔍 Resolved path: $resolvedUrl\n';
-        errorMsg += '📝 Attempted paths:\n';
-        for (int i = 0; i < pathsToTry.length; i++) {
-          errorMsg += '  ${i + 1}. ${pathsToTry[i]}\n';
-        }
-        
-        if (lastError?.response?.statusCode == 404) {
-          errorMsg += '\n⚠️ All paths returned 404. The file may not exist on ESP32.';
-        } else if (lastError?.response?.statusCode == 500) {
-          errorMsg += '\n⚠️ Server error (500). ESP32 may be having issues.';
-        } else {
-          errorMsg += '\n⚠️ Error: ${lastError?.message ?? "Unknown error"}';
-        }
-        
-        errorMsg += '\n\n💡 Try re-uploading the file, or check ESP32 Serial Monitor for available files.';
-        
-        // Show as dialog instead of snackbar for better readability
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
@@ -567,13 +442,6 @@ class MessageItem extends StatelessWidget {
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('OK'),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  // Try to copy error to clipboard would be nice, but keep it simple
-                },
-                child: const Text('Copy Error'),
               ),
             ],
           ),
@@ -737,22 +605,23 @@ class MessageItem extends StatelessWidget {
   String _getEncodedFullUrl() {
     if (!message.hasAttachment) return '';
     final raw = message.attachmentUrl!;
-    String url;
-    if (raw.startsWith('http')) {
-      url = raw;
-    } else {
-      String path = raw.startsWith('/') ? raw : '/$raw';
-      path = path.replaceAll(RegExp(r'//+'), '/');
-      // URL encode path parts
-      final pathParts = path.split('/');
-      final encodedParts = pathParts.map((part) {
-        if (part.isEmpty) return part;
-        return Uri.encodeComponent(part);
-      }).toList();
-      final encodedPath = encodedParts.join('/');
-      url = '${Constants.baseUrl}$encodedPath';
+    
+    // If it's already a full URL (cloud or ESP32), return as-is
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      return raw;
     }
-    return url;
+    
+    // Otherwise, it's an ESP32 path - construct full URL
+    String path = raw.startsWith('/') ? raw : '/$raw';
+    path = path.replaceAll(RegExp(r'//+'), '/');
+    // URL encode path parts
+    final pathParts = path.split('/');
+    final encodedParts = pathParts.map((part) {
+      if (part.isEmpty) return part;
+      return Uri.encodeComponent(part);
+    }).toList();
+    final encodedPath = encodedParts.join('/');
+    return '${Constants.baseUrl}$encodedPath';
   }
 
   Widget _buildImageAttachment(BuildContext context) {
