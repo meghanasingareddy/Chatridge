@@ -98,6 +98,9 @@ class CloudMessagingService {
     required String username,
     required String text,
     String? target,
+    String? attachmentUrl,
+    String? attachmentName,
+    String? attachmentType,
   }) async {
     try {
       _initialize();
@@ -114,6 +117,9 @@ class CloudMessagingService {
         text: text,
         target: target,
         timestamp: DateTime.now(),
+        attachmentUrl: attachmentUrl,
+        attachmentName: attachmentName,
+        attachmentType: attachmentType,
       );
       
       // Add to list (keep last 200 messages)

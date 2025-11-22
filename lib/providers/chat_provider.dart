@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/api_service.dart';
 import '../services/storage_service.dart';
+import '../services/cloud_file_service.dart';
+import '../services/cloud_messaging_service.dart';
 import '../utils/constants.dart';
 
 class ChatProvider extends ChangeNotifier {
@@ -231,6 +233,28 @@ class ChatProvider extends ChangeNotifier {
           attachmentType: _getFileType(filePath),
         );
 
+        // Check if this is a cloud URL - if so, send message to cloud messaging service
+        final isCloudUrl = CloudFileService.isCloudUrl(attachmentUrl);
+        if (isCloudUrl) {
+          debugPrint('ChatProvider: File uploaded to cloud, sending message to cloud service');
+          try {
+            // Send message with file attachment info to cloud
+            final cloudMessagingService = CloudMessagingService();
+            await cloudMessagingService.sendMessage(
+              username: username,
+              text: 'Shared a file',
+              target: target,
+              attachmentUrl: attachmentUrl,
+              attachmentName: fileName,
+              attachmentType: _getFileType(filePath),
+            );
+            debugPrint('ChatProvider: File message sent to cloud messaging service');
+          } catch (e) {
+            debugPrint('ChatProvider: Failed to send message to cloud: $e');
+            // Continue anyway - message is stored locally
+          }
+        }
+
         // Remove any local message with same content to prevent duplicates
         final now = DateTime.now();
         _messages.removeWhere((msg) => 
@@ -247,7 +271,7 @@ class ChatProvider extends ChangeNotifier {
         notifyListeners(); // Update UI immediately
         debugPrint('ChatProvider: File message created and saved');
         
-        // Fetch messages after a short delay to get server message with proper ID
+        // Fetch messages after a short delay to get server/cloud message with proper ID
         await Future.delayed(const Duration(milliseconds: 500));
         await fetchMessages();
       } else {
