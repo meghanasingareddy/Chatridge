@@ -6,6 +6,7 @@ import '../models/message.dart';
 import '../models/device.dart';
 import '../utils/constants.dart';
 import 'cloud_file_service.dart';
+import 'cloud_messaging_service.dart';
 
 class ApiService {
   factory ApiService() => _instance;
@@ -50,11 +51,17 @@ class ApiService {
     _isInitialized = true;
   }
 
-  // Get all messages
+  // Get all messages (with cloud fallback)
   Future<List<Message>> getMessages() async {
+    // Try ESP32 first
     try {
       initialize();
-      final response = await _dio.get(Constants.messagesEndpoint);
+      final response = await _dio.get(
+        Constants.messagesEndpoint,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
@@ -62,17 +69,44 @@ class ApiService {
       }
       throw Exception('Failed to fetch messages');
     } on DioException catch (e) {
+      // If ESP32 unavailable, try cloud fallback
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        debugPrint('ESP32 unavailable, trying cloud messaging...');
+        try {
+          final cloudService = CloudMessagingService();
+          final messages = await cloudService.getMessages();
+          debugPrint('Cloud messaging: Fetched ${messages.length} messages');
+          return messages;
+        } catch (cloudError) {
+          debugPrint('Cloud messaging also failed: $cloudError');
+        }
+      }
       throw _handleDioError(e);
     } catch (e) {
+      // Try cloud fallback
+      debugPrint('ESP32 error, trying cloud messaging...');
+      try {
+        final cloudService = CloudMessagingService();
+        return await cloudService.getMessages();
+      } catch (cloudError) {
+        debugPrint('Cloud messaging failed: $cloudError');
+      }
       throw Exception('Network error: $e');
     }
   }
 
-  // Get connected devices
+  // Get connected devices (with cloud fallback)
   Future<List<Device>> getDevices() async {
+    // Try ESP32 first
     try {
       initialize();
-      final response = await _dio.get(Constants.devicesEndpoint);
+      final response = await _dio.get(
+        Constants.devicesEndpoint,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 3),
+        ),
+      );
 
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data;
@@ -80,18 +114,37 @@ class ApiService {
       }
       throw Exception('Failed to fetch devices');
     } on DioException catch (e) {
+      // If ESP32 unavailable, try cloud fallback
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        debugPrint('ESP32 unavailable, trying cloud devices...');
+        try {
+          final cloudService = CloudMessagingService();
+          return await cloudService.getDevices();
+        } catch (cloudError) {
+          debugPrint('Cloud devices also failed: $cloudError');
+        }
+      }
       throw _handleDioError(e);
     } catch (e) {
+      // Try cloud fallback
+      try {
+        final cloudService = CloudMessagingService();
+        return await cloudService.getDevices();
+      } catch (cloudError) {
+        debugPrint('Cloud devices failed: $cloudError');
+      }
       throw Exception('Network error: $e');
     }
   }
 
-  // Send message
+  // Send message (with cloud fallback)
   Future<bool> sendMessage({
     required String username,
     required String text,
     String? target,
   }) async {
+    // Try ESP32 first
     try {
       initialize();
       final queryParams = {
@@ -103,29 +156,91 @@ class ApiService {
       final response = await _dio.get(
         Constants.sendEndpoint,
         queryParameters: queryParams,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 3),
+        ),
       );
 
       return response.statusCode == 200;
     } on DioException catch (e) {
+      // If ESP32 unavailable, try cloud fallback
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        debugPrint('ESP32 unavailable, trying cloud messaging...');
+        try {
+          final cloudService = CloudMessagingService();
+          final success = await cloudService.sendMessage(
+            username: username,
+            text: text,
+            target: target,
+          );
+          if (success) {
+            debugPrint('Message sent via cloud');
+            return true;
+          }
+        } catch (cloudError) {
+          debugPrint('Cloud messaging also failed: $cloudError');
+        }
+      }
       throw _handleDioError(e);
     } catch (e) {
+      // Try cloud fallback
+      debugPrint('ESP32 error, trying cloud messaging...');
+      try {
+        final cloudService = CloudMessagingService();
+        final success = await cloudService.sendMessage(
+          username: username,
+          text: text,
+          target: target,
+        );
+        if (success) return true;
+      } catch (cloudError) {
+        debugPrint('Cloud messaging failed: $cloudError');
+      }
       throw Exception('Network error: $e');
     }
   }
 
-  // Register device
+  // Register device (with cloud fallback)
   Future<bool> registerDevice(String name) async {
+    // Try ESP32 first
     try {
       initialize();
       final response = await _dio.get(
         Constants.registerEndpoint,
         queryParameters: {'name': name},
+        options: Options(
+          receiveTimeout: const Duration(seconds: 3),
+        ),
       );
 
       return response.statusCode == 200;
     } on DioException catch (e) {
+      // If ESP32 unavailable, try cloud fallback
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.connectionError) {
+        debugPrint('ESP32 unavailable, registering in cloud...');
+        try {
+          final cloudService = CloudMessagingService();
+          final success = await cloudService.registerDevice(name);
+          if (success) {
+            debugPrint('Device registered in cloud');
+            return true;
+          }
+        } catch (cloudError) {
+          debugPrint('Cloud registration also failed: $cloudError');
+        }
+      }
       throw _handleDioError(e);
     } catch (e) {
+      // Try cloud fallback
+      try {
+        final cloudService = CloudMessagingService();
+        final success = await cloudService.registerDevice(name);
+        if (success) return true;
+      } catch (cloudError) {
+        debugPrint('Cloud registration failed: $cloudError');
+      }
       throw Exception('Network error: $e');
     }
   }
@@ -190,13 +305,13 @@ class ApiService {
 
       debugPrint('Sending upload request to: ${Constants.uploadEndpoint}');
 
-      // Create a new Dio instance with longer timeout for file uploads
+      // Create a new Dio instance with shorter timeout for ESP32 (faster fallback to cloud)
       final uploadDio = Dio(
         BaseOptions(
           baseUrl: Constants.baseUrl,
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 60),
-          sendTimeout: const Duration(seconds: 60),
+          connectTimeout: const Duration(seconds: 3), // Short timeout for faster cloud fallback
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5), // Short timeout for faster cloud fallback
           // Don't set CORS headers in request - these are response headers from server
         ),
       );
@@ -228,6 +343,10 @@ class ApiService {
         Constants.uploadEndpoint,
         data: formData,
         onSendProgress: onProgress,
+        options: Options(
+          receiveTimeout: const Duration(seconds: 5),
+          sendTimeout: const Duration(seconds: 5), // Short timeout for faster cloud fallback
+        ),
       );
 
       debugPrint('Upload response status: ${response.statusCode}');
