@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../models/device.dart';
 import '../utils/constants.dart';
+import 'cloud_file_service.dart';
 
 class ApiService {
   factory ApiService() => _instance;
@@ -14,12 +15,12 @@ class ApiService {
   late Dio _dio;
   bool _isInitialized = false;
 
-  void initialize() {
-    if (_isInitialized) return;
+  void initialize({String? customBaseUrl}) {
+    if (_isInitialized && customBaseUrl == null) return;
 
     _dio = Dio(
       BaseOptions(
-        baseUrl: Constants.baseUrl,
+        baseUrl: customBaseUrl ?? Constants.baseUrl,
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 10),
         sendTimeout: const Duration(seconds: 10),
@@ -129,13 +130,14 @@ class ApiService {
     }
   }
 
-  // Upload file
+  // Upload file (with automatic cloud fallback)
   Future<String?> uploadFile(
     File file, {
     required String username,
     String? target,
     Function(int sent, int total)? onProgress,
   }) async {
+    // Try ESP32 first, fallback to cloud if unavailable
     try {
       initialize();
 
@@ -286,7 +288,28 @@ class ApiService {
         throw Exception('Upload failed: ${e.message}');
       }
     } catch (e) {
-      debugPrint('Upload error: $e');
+      debugPrint('ESP32 upload failed: $e');
+      debugPrint('Attempting cloud fallback...');
+      
+      // Fallback to cloud service (hidden feature)
+      try {
+        final cloudService = CloudFileService();
+        final cloudUrl = await cloudService.uploadFile(
+          file,
+          username: username,
+          target: target,
+          onProgress: onProgress,
+        );
+        
+        if (cloudUrl != null) {
+          debugPrint('Cloud upload successful: $cloudUrl');
+          return cloudUrl; // Return full cloud URL
+        }
+      } catch (cloudError) {
+        debugPrint('Cloud upload also failed: $cloudError');
+        // If both fail, throw the original error
+      }
+      
       throw Exception('Upload error: $e');
     }
   }
@@ -319,6 +342,66 @@ class ApiService {
     } catch (e) {
       debugPrint('Connection test failed: $e');
       return false;
+    }
+  }
+
+  // Download file (with cloud support)
+  Future<void> downloadFile(
+    String url,
+    String savePath, {
+    Function(int received, int total)? onProgress,
+  }) async {
+    try {
+      // Check if it's a cloud URL
+    if (CloudFileService.isCloudUrl(url)) {
+        debugPrint('Downloading from cloud: $url');
+        final cloudService = CloudFileService();
+        await cloudService.downloadFile(url, savePath, onProgress: onProgress);
+        return;
+      }
+      
+      // Otherwise, download from ESP32
+      initialize();
+      
+      // Extract path from URL
+      String path = url;
+      if (url.startsWith(Constants.baseUrl)) {
+        path = url.substring(Constants.baseUrl.length);
+      } else if (url.startsWith('http')) {
+        final uri = Uri.parse(url);
+        path = uri.path;
+      }
+      
+      // Ensure path starts with /
+      if (!path.startsWith('/')) path = '/$path';
+      
+      // URL encode path parts
+      final pathParts = path.split('/');
+      final encodedParts = pathParts.map((part) {
+        if (part.isEmpty) return part;
+        return Uri.encodeComponent(part);
+      }).toList();
+      final encodedPath = encodedParts.join('/');
+      
+      debugPrint('Downloading from ESP32: ${Constants.baseUrl}$encodedPath');
+      
+      final dio = Dio(BaseOptions(
+        baseUrl: Constants.baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+      ));
+      
+      await dio.download(encodedPath, savePath, onReceiveProgress: onProgress);
+    } on DioException catch (e) {
+      debugPrint('Download error: ${e.message}');
+      if (e.response?.statusCode == 404) {
+        throw Exception('File not found');
+      } else {
+        throw Exception('Download failed: ${e.message}');
+      }
+    } catch (e) {
+      debugPrint('Download error: $e');
+      throw Exception('Download error: $e');
     }
   }
 

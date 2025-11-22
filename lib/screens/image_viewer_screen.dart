@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:photo_view/photo_view.dart';
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../utils/constants.dart';
+import '../services/api_service.dart';
+import '../services/storage_service.dart';
 
 class ImageViewerScreen extends StatelessWidget {
   const ImageViewerScreen({
@@ -33,36 +34,13 @@ class ImageViewerScreen extends StatelessWidget {
             tooltip: 'Share',
             onPressed: () async {
               try {
-                final tempDir = await getTemporaryDirectory();
+                final dir = await StorageService.getDownloadDirectory();
                 final fileName = imageName ?? 'image.jpg';
-                final savePath = '${tempDir.path}/$fileName';
+                final savePath = '${dir.path}/$fileName';
                 
-                // Extract path from URL
-                String path = imageUrl;
-                if (imageUrl.startsWith(Constants.baseUrl)) {
-                  path = imageUrl.substring(Constants.baseUrl.length);
-                } else if (imageUrl.startsWith('http')) {
-                  // Full URL, extract just path
-                  final uri = Uri.parse(imageUrl);
-                  path = uri.path;
-                }
-                
-                // Create Dio instance with baseUrl
-                final dio = Dio(BaseOptions(
-                  baseUrl: Constants.baseUrl,
-                  connectTimeout: const Duration(seconds: 30),
-                  receiveTimeout: const Duration(seconds: 60),
-                  headers: {
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                  },
-                ));
-                
-                // Ensure path starts with /
-                if (!path.startsWith('/')) path = '/$path';
-                debugPrint('Downloading image for share: ${Constants.baseUrl}$path');
-                await dio.download(path, savePath);
+                // Use API service for download (handles both ESP32 and cloud)
+                final apiService = ApiService();
+                await apiService.downloadFile(imageUrl, savePath);
                 
                 if (!context.mounted) return;
                 
@@ -85,36 +63,13 @@ class ImageViewerScreen extends StatelessWidget {
             tooltip: 'Download',
             onPressed: () async {
               try {
-                final tempDir = await getTemporaryDirectory();
+                final dir = await StorageService.getDownloadDirectory();
                 final fileName = imageName ?? 'image.jpg';
-                final savePath = '${tempDir.path}/$fileName';
+                final savePath = '${dir.path}/$fileName';
                 
-                // Extract path from URL
-                String path = imageUrl;
-                if (imageUrl.startsWith(Constants.baseUrl)) {
-                  path = imageUrl.substring(Constants.baseUrl.length);
-                } else if (imageUrl.startsWith('http')) {
-                  // Full URL, extract just path
-                  final uri = Uri.parse(imageUrl);
-                  path = uri.path;
-                }
-                
-                // Create Dio instance with baseUrl
-                final dio = Dio(BaseOptions(
-                  baseUrl: Constants.baseUrl,
-                  connectTimeout: const Duration(seconds: 30),
-                  receiveTimeout: const Duration(seconds: 60),
-                  headers: {
-                    'Access-Control-Allow-Origin': '*',
-                    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-                    'Access-Control-Allow-Headers': 'Content-Type',
-                  },
-                ));
-                
-                // Ensure path starts with /
-                if (!path.startsWith('/')) path = '/$path';
-                debugPrint('Downloading image: ${Constants.baseUrl}$path');
-                await dio.download(path, savePath);
+                // Use API service for download (handles both ESP32 and cloud)
+                final apiService = ApiService();
+                await apiService.downloadFile(imageUrl, savePath);
                 
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
