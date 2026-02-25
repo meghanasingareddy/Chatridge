@@ -1,102 +1,239 @@
-# Chatridge - Offline Local WiFi Messaging System
-
 <div align="center">
 
-![Chatridge Logo](https://img.shields.io/badge/Chatridge-Offline%20Messaging-blue?style=for-the-badge)
+# 💬 Chatridge
+
+### Offline Local WiFi Messaging
+
 ![Flutter](https://img.shields.io/badge/Flutter-3.35.5-blue?style=flat-square&logo=flutter)
 ![ESP32](https://img.shields.io/badge/ESP32-Compatible-green?style=flat-square&logo=arduino)
-![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square)
+![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Windows%20%7C%20Linux-lightgrey?style=flat-square)
+![License](https://img.shields.io/badge/License-MIT-yellow?style=flat-square)
 
-**A cross-platform offline messaging system powered by ESP32 WiFi access point**
+*A cross-platform offline messaging system powered by ESP32 WiFi — no internet required.*
 
 </div>
 
+---
+
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Features](#features)
+- [Abstract](#abstract)
+- [Introduction](#introduction)
+- [System Components](#system-components)
 - [Screenshots](#screenshots)
-- [Architecture](#architecture)
+- [Working Principle](#working-principle)
+- [Use Cases](#use-cases)
+- [Results](#results)
+- [Future Scope](#future-scope)
 - [Setup Guide](#setup-guide)
-- [Usage](#usage)
-- [Platform Support](#platform-support)
-- [API Documentation](#api-documentation)
-- [Development](#development)
-- [Contributing](#contributing)
+- [Conclusion](#conclusion)
 
-## 🌟 Overview
+---
 
-Chatridge is a complete offline messaging solution that enables local communication between multiple devices without requiring internet connectivity. Perfect for remote areas, events, secure environments, or any scenario where traditional internet-based messaging is unavailable.
+## 📄 Abstract
 
-### Key Highlights
+In situations where internet access is unavailable or restricted, communicating through regular messaging applications becomes difficult. This creates a need for a simple offline method that allows nearby mobile phones, laptops, desktops, and other devices to exchange messages without relying on online networks.
 
-- ✅ **100% Offline** - No internet connection required
-- ✅ **Cross-Platform** - Android, iOS, Windows, Linux support
-- ✅ **Real-time Messaging** - Instant message delivery
-- ✅ **File Sharing** - Upload and share images, documents, and files
-- ✅ **Multi-Device** - Support for up to 50 concurrent devices
-- ✅ **Privacy-Focused** - All data stays on local network
+This problem is addressed by creating a **local wireless network using a microcontroller** and enabling connected devices — across multiple platforms — to communicate through a **browser-based interface** and an **application**. This method supports basic text messaging through the web and extended features through the app, all functioning **completely offline**.
 
-## ✨ Features
+---
 
-### Core Messaging
-- **Real-time Chat**: Send and receive messages instantly
-- **Private Messaging**: Direct messages to specific devices
-- **Message History**: Persistent local storage of all conversations
-- **Device Discovery**: See all connected devices in real-time
-- **Online Status**: Visual indicators for device connectivity
+## 📖 Introduction
 
-### File Sharing
-- **Image Sharing**: Upload and view images with full-screen viewer
-- **Document Support**: Share PDFs, Word docs, Excel sheets, and more
-- **File Upload**: Progress tracking during file uploads
-- **Share Functionality**: Share files directly from the app
-- **Multiple Sources**: Choose from camera, gallery, or file picker
+This project proposes an **offline communication system** that allows multiple devices to exchange messages without the need for internet connectivity. The system works by creating a private wireless network using a microcontroller, allowing nearby devices such as mobile phones, laptops, desktops, and Linux-based systems to connect and communicate.
 
-### User Experience
-- **Modern UI**: Clean, intuitive Material Design interface
-- **Auto WiFi Connection**: Automatic connection on mobile devices
-- **Manual WiFi Support**: Desktop platforms with OS-level management
-- **Error Handling**: User-friendly error messages and retry mechanisms
-- **Settings**: Customizable polling intervals and user preferences
+Users can access the system in two ways:
+- Through a **simple web interface** for basic text messaging
+- Through an **application** that provides extended features such as sending images and various file types
 
-### Platform Features
-- **Mobile**: Full Android/iOS support with native features
-- **Desktop**: Windows and Linux native applications
-- **Responsive**: Adapts to different screen sizes and orientations
+The goal of this solution is to offer an easy, reliable, and platform-independent way for people to communicate locally in places where internet access is limited or unavailable.
 
-## 🏗️ Architecture
+---
 
-### System Components
+## 🔧 System Components
+
+The Chatridge system consists of three major parts that work together to enable offline communication:
+
+### 3.1 — ESP32 Module (Server Unit)
+
+<div align="center">
+<img src="images/esp32_hardware.jpg" alt="ESP32 Module" width="400"/>
+
+*ESP32 microcontroller powering the Chatridge network*
+</div>
+
+- Acts as a **WiFi Access Point** (Hotspot)
+- Creates the private network named **Chatridge**
+- Stores uploaded files using **SPIFFS**
+- Routes incoming and outgoing messages
+- Hosts the offline web interface accessible at `http://192.168.4.1/`
+
+---
+
+### 3.2 — Flutter Application (Client Application)
+
+This is the main communication interface for users. It provides:
+
+- ✅ **Real-time messaging**
+- ✅ **File sharing** (images, PDFs, Word files, Excel sheets, PPTs, and more)
+- ✅ **Chat history storage**
+- ✅ **Device discovery**
+- ✅ **Private messaging**
+- ✅ **Cross-platform support** (Android, Windows, Linux, and laptops)
+
+<div align="center">
+
+| Connection Screen | Chat List | Group Chat |
+|:-:|:-:|:-:|
+| <img src="images/app_connect_screen.jpg" alt="Connection Screen" width="250"/> | <img src="images/app_chat_list.jpg" alt="Chat List" width="250"/> | <img src="images/app_group_chat.jpg" alt="Group Chat with File Sharing" width="250"/> |
+| *Connect to Chatridge network* | *View conversations & contacts* | *Messaging with file sharing* |
+
+</div>
+
+---
+
+### 3.3 — Web Interface (Browser-Based Messaging)
+
+<div align="center">
+<img src="images/web_interface.jpg" alt="Web Interface" width="300"/>
+
+*Browser-based messaging at `http://192.168.4.1/`*
+</div>
+
+- Accessible from **any device** by visiting `http://192.168.4.1/`
+- Allows users to send and receive **text messages only**
+- Does **not** support image or file sharing
+- Works on mobiles, laptops, desktops, Linux systems, and any browser-enabled device
+
+---
+
+## 📸 Screenshots
+
+<div align="center">
+
+| Web Interface | ESP32 Hardware | App – Connect |
+|:-:|:-:|:-:|
+| <img src="images/web_interface.jpg" alt="Web Interface" width="250"/> | <img src="images/esp32_hardware.jpg" alt="ESP32 Module" width="250"/> | <img src="images/app_connect_screen.jpg" alt="App Connect" width="250"/> |
+
+| App – Chat List | App – Group Chat |
+|:-:|:-:|
+| <img src="images/app_chat_list.jpg" alt="Chat List" width="250"/> | <img src="images/app_group_chat.jpg" alt="Group Chat" width="250"/> |
+
+</div>
+
+---
+
+## ⚙️ Working Principle
+
+Chatridge works by creating a small, local communication environment where devices connect and interact without using the internet.
+
+### Step 1 — Network Creation
+
+The ESP32 module powers on and creates a **WiFi hotspot** called **Chatridge**. Any nearby device can connect to this hotspot using the password configured in the ESP32.
+
+> **Default Credentials:**
+> - SSID: `Chatridge`
+> - Password: `12345678`
+
+### Step 2 — Device Access
+
+Users can communicate through:
+- The **mobile/desktop app**, or
+- The **browser interface** at `http://192.168.4.1/`
+
+### Step 3 — Message Handling
+
+- When a message is sent, the ESP32 receives it through **HTTP requests**
+- The ESP32 stores the message temporarily and **forwards it to all connected devices**
+- In the app, the message appears instantly due to **continuous polling and updates**
+- In the web interface, users can view or send **text messages only**
+
+### Step 4 — File Sharing (App Only)
+
+Through the Flutter app, users can share:
+
+| File Type | Supported |
+|:-|:-:|
+| Images (JPG, PNG, etc.) | ✅ |
+| PDF Documents | ✅ |
+| Word Documents (.docx) | ✅ |
+| Excel Spreadsheets (.xlsx) | ✅ |
+| PowerPoint Presentations (.pptx) | ✅ |
+| Other Files | ✅ |
+
+Files are uploaded to the ESP32 and then shared across the local network.
+
+### Block Diagram
 
 ```
-┌─────────────────┐         ┌─────────────────┐
-│  Flutter App    │ ◄─────► │   ESP32 Server  │
-│  (Multi-Platform)│         │  (WiFi AP + API)│
-└─────────────────┘         └─────────────────┘
-         │                           │
-         │                           │
-    ┌────▼────┐                ┌────▼────┐
-    │  Mobile │                │ SPIFFS  │
-    │Desktop  │                │ Storage │
-    └─────────┘                └─────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    ESP32 Module                          │
+│              (WiFi Access Point + Server)                │
+│          SSID: Chatridge | IP: 192.168.4.1              │
+│                  SPIFFS File Storage                     │
+└──────────┬──────────────────────┬────────────────────────┘
+           │                      │
+     ┌─────▼──────┐        ┌─────▼──────┐
+     │  Flutter    │        │    Web     │
+     │    App      │        │ Interface  │
+     │             │        │            │
+     │ • Messages  │        │ • Text     │
+     │ • Files     │        │   Messages │
+     │ • Images    │        │   Only     │
+     │ • Private   │        │            │
+     │   Chat      │        │            │
+     └─────────────┘        └────────────┘
+      Android, Windows,      Any Browser
+      Linux, Laptops         (Mobile/Desktop)
 ```
 
-### Technology Stack
+---
 
-**Frontend (Flutter)**
-- Framework: Flutter 3.35.5
-- State Management: Provider
-- Local Storage: Hive + SharedPreferences
-- HTTP Client: Dio
-- File Handling: file_picker, image_picker
-- Sharing: share_plus
+## 🎯 Use Cases
 
-**Backend (ESP32)**
-- Microcontroller: ESP32
-- Storage: SPIFFS (1-2MB)
-- Communication: WiFi Access Point
-- Protocol: HTTP REST API
+Chatridge is useful in many scenarios, especially where internet is absent:
+
+- 🏔️ **Remote areas** with limited connectivity
+- 🎓 **College campuses** for offline demonstrations
+- 🎪 **Events or workshops** requiring group communication
+- 🆘 **Disaster management** where networks fail
+- 🔒 **Secure environments** where internet is restricted
+- 👥 **Small teams** needing quick local communication
+
+---
+
+## 📊 Results
+
+After testing the system across multiple devices, the following results were observed:
+
+| Metric | Result |
+|:-|:-|
+| **Max Simultaneous Devices** | 40–50 devices |
+| **Message Delivery** | Instant (via app on Android, Windows, Linux) |
+| **Max File Size** | Up to 10 MB |
+| **Usable SPIFFS Storage** | ~1.5–1.9 MB |
+| **Small Images Capacity** | 15–20 images |
+| **Medium Images Capacity** | 3–4 images |
+| **Document Capacity** | 1–2 documents |
+| **Effective Range** | 15–20 meters |
+| **Browser Text Messaging** | Smooth across all browsers |
+
+> **Overall**, the system demonstrated stable offline communication, practical storage handling, and high usability in real-world conditions.
+
+---
+
+## 🔮 Future Scope
+
+### Multi-ESP32 Mesh-Like Network
+The system can be extended by connecting **multiple ESP32 units** together to form a mesh-like network. Each ESP32 acts as a relay node, allowing messages to travel from one node to another. This increases the coverage area and enables communication even when users are far from the main ESP32 access point. Such an approach is helpful for large campuses, remote areas, and emergency communication.
+
+### External Storage Support
+Since the internal SPIFFS memory is limited, the system can be upgraded using **SD card modules or external flash storage**. This will significantly increase file-sharing capacity and allow users to store and transfer larger files without running out of space.
+
+### Offline Location-Based Services
+Future versions can include **location broadcasting** within the local network. ESP32 nodes can send small location or identification signals to help users identify nearby devices offline, which is useful during rescue operations, campus coordination, or group activities.
+
+---
 
 ## 🚀 Setup Guide
 
@@ -137,322 +274,48 @@ Chatridge is a complete offline messaging solution that enables local communicat
      HTTP Server started on port 80
      ```
 
-**Default WiFi Credentials:**
-- SSID: `Chatridge`
-- Password: `12345678`
-- IP Address: `192.168.4.1`
-
 ### Flutter App Setup
 
-1. **Clone Repository**
-   ```bash
-   git clone <repository-url>
-   cd Chatridge
-   ```
+```bash
+# Clone the repository
+git clone https://github.com/meghanasingareddy/Chatridge.git
+cd Chatridge
 
-2. **Install Dependencies**
-   ```bash
-   flutter pub get
-   ```
+# Install dependencies
+flutter pub get
 
-3. **Generate Code**
-   ```bash
-   flutter packages pub run build_runner build
-   ```
+# Run on mobile
+flutter run
 
-4. **Run the App**
-   ```bash
-   # Mobile
-   flutter run
-   
-   # Desktop (Windows)
-   flutter run -d windows
-   
-   # Desktop (Linux)
-   flutter run -d linux
-   ```
+# Run on Windows
+flutter run -d windows
+
+# Run on Linux
+flutter run -d linux
+```
 
 ### Building for Release
 
-**Android APK:**
 ```bash
+# Android APK
 flutter build apk --release
-# Output: build/app/outputs/flutter-apk/app-release.apk
-```
 
-**Windows Executable:**
-```bash
+# Windows
 flutter build windows --release
-# Output: build/windows/x64/runner/Release/chatridge.exe
-```
 
-**Linux App:**
-```bash
+# Linux
 flutter build linux --release
-# Output: build/linux/x64/release/bundle/
 ```
 
-## 📱 Usage
+---
 
-### First Time Setup
+## ✅ Conclusion
 
-1. **Connect to Network**
-   - **Mobile**: App will automatically connect to "Chatridge" WiFi
-   - **Desktop**: Manually connect to "Chatridge" WiFi via OS settings
-   - Password: `12345678`
+Chatridge provides a **practical and efficient offline communication platform** that works without internet connectivity. By combining an ESP32-based WiFi network with a cross-platform Flutter application, the system enables nearby devices to exchange text messages and share files in a secure and local environment.
 
-2. **Launch App**
-   - Open Chatridge app
-   - Enter your username and device name
-   - Tap "Register & Start Chatting"
+The project is **simple to use, platform-independent**, and suitable for remote communication, emergency situations, and educational demonstrations. Future improvements may include encrypted messaging, group chat support, extended storage, and a richer web interface.
 
-3. **Start Messaging**
-   - Type messages in the input field
-   - Tap send or press Enter
-   - Messages appear in real-time
-
-### Using Features
-
-**Send Files:**
-1. Tap the attachment button (📎)
-2. Choose from:
-   - 📷 Take Photo
-   - 🖼️ Choose from Gallery
-   - 📁 Choose File
-3. File uploads automatically and appears in chat
-
-**View Images:**
-- Tap any image to view full-screen
-- Use pinch to zoom
-- Share or download using toolbar buttons
-
-**Private Messages:**
-1. Tap the people icon (👥)
-2. Select a device from the list
-3. Messages sent will be private to that device
-
-**Share Files:**
-- Tap share button (📤) on images
-- Choose sharing method (WhatsApp, Email, etc.)
-- File is downloaded and shared
-
-### Settings
-
-Access settings via the gear icon (⚙️):
-- Change username/device name
-- Adjust message polling interval
-- Clear message history
-- View storage information
-
-## 💻 Platform Support
-
-### Android
-- ✅ Full support
-- ✅ Auto WiFi connection
-- ✅ All features available
-- **Build**: `flutter build apk --release`
-
-### iOS
-- ✅ Full support
-- ✅ Auto WiFi connection
-- ✅ App Store ready (with developer account)
-- **Build**: `flutter build ios --release`
-
-### Windows
-- ✅ Native Windows app
-- ⚠️ Manual WiFi connection required
-- ✅ All messaging features
-- **Build**: `flutter build windows --release`
-
-### Linux
-- ✅ Native Linux app
-- ⚠️ Manual WiFi connection required
-- ✅ All messaging features
-- **Build**: `flutter build linux --release`
-
-## 🔌 API Documentation
-
-### ESP32 Endpoints
-
-**Base URL**: `http://192.168.4.1`
-
-#### Get Messages
-```
-GET /messages
-Response: JSON array of messages
-```
-
-#### Send Message
-```
-GET /send?username=<username>&text=<message>&target=<target>
-Response: {"status":"ok","id":"<message_id>"}
-```
-
-#### Upload File
-```
-POST /upload
-Body: multipart/form-data
-  - file: <file_data>
-  - username: <username>
-  - target: <target> (optional)
-Response: {"status":"ok","url":"/<filename>"}
-```
-
-#### Get Devices
-```
-GET /devices
-Response: JSON array of connected devices
-```
-
-#### Register Device
-```
-GET /register?name=<device_name>
-Response: {"status":"ok"}
-```
-
-#### Serve Files
-```
-GET /<filename>
-Response: File content with appropriate MIME type
-```
-
-## 🛠️ Development
-
-### Project Structure
-
-```
-lib/
-├── main.dart                 # App entry point
-├── app.dart                  # Main app widget
-├── models/                   # Data models
-│   ├── message.dart
-│   └── device.dart
-├── providers/                # State management
-│   ├── connectivity_provider.dart
-│   ├── chat_provider.dart
-│   └── device_provider.dart
-├── services/                 # Business logic
-│   ├── api_service.dart
-│   ├── storage_service.dart
-│   ├── file_service.dart
-│   └── wifi_service.dart    # Platform-aware WiFi
-├── screens/                  # UI screens
-│   ├── login_screen.dart
-│   ├── connect_screen.dart
-│   ├── chat_screen.dart
-│   ├── settings_screen.dart
-│   └── image_viewer_screen.dart
-├── widgets/                  # Reusable components
-│   ├── message_item.dart
-│   ├── device_list.dart
-│   ├── input_area.dart
-│   └── file_attachment_button.dart
-└── utils/                    # Utilities
-    ├── constants.dart
-    ├── helpers.dart
-    └── permissions.dart
-```
-
-### Key Dependencies
-
-```yaml
-dependencies:
-  flutter:
-    sdk: flutter
-  provider: ^6.0.0           # State management
-  dio: ^5.0.0                # HTTP client
-  wifi_iot: ^0.3.19          # WiFi control (mobile only)
-  shared_preferences: ^2.0.0  # Settings storage
-  hive: ^2.0.0                # Local database
-  hive_flutter: ^1.1.0
-  file_picker: ^8.0.0         # File selection
-  image_picker: ^1.0.0        # Image selection
-  path_provider: ^2.1.0       # File paths
-  permission_handler: ^11.0.0 # Permissions
-  connectivity_plus: ^6.0.0   # Network status
-  open_file: ^3.2.1           # File opening
-  photo_view: ^0.14.0         # Image viewer
-  share_plus: ^7.2.2           # File sharing
-  cupertino_icons: ^1.0.2
-```
-
-### Configuration
-
-Edit `lib/utils/constants.dart` to customize:
-- ESP32 WiFi SSID and password
-- Base URL (default: http://192.168.4.1)
-- Message polling intervals
-- File size limits
-- Allowed file types
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Cannot connect to ESP32**
-- Verify ESP32 is powered on and broadcasting
-- Check WiFi credentials (Chatridge/12345678)
-- Ensure ESP32 IP is 192.168.4.1
-- Try restarting ESP32
-
-**Messages not sending**
-- Check network connection status
-- Verify ESP32 server is running (check Serial Monitor)
-- Try refreshing the connection
-
-**File upload fails**
-- Check file size (max 10MB default)
-- Verify file type is supported
-- Ensure storage permissions are granted
-- Check SPIFFS space on ESP32
-
-**Desktop WiFi connection**
-- Connect manually via OS WiFi settings first
-- Then launch the app
-- App will detect you're on desktop and skip auto-connect
-
-**Build errors**
-- Run `flutter clean`
-- Run `flutter pub get`
-- Verify Flutter version: `flutter --version`
-- Check platform-specific requirements
-
-## 🔐 Permissions
-
-**Android/iOS:**
-- Internet (for local network)
-- Storage (file access)
-- Camera (photo capture)
-- Network State (connectivity)
-
-**Desktop:**
-- Network access
-- File system access
-
-## 📊 Technical Specifications
-
-- **Programming Languages**: Dart (Flutter), C++ (Arduino/ESP32)
-- **Communication**: HTTP REST API over WiFi
-- **Data Format**: JSON
-- **Storage**: SPIFFS (ESP32), Hive (Flutter)
-- **Network**: WiFi 802.11 b/g/n
-- **Max File Size**: 10MB (configurable)
-- **Max Devices**: 50 concurrent
-- **Message Buffer**: 200 messages in memory
-- **SPIFFS Capacity**: 1-2MB (typical ESP32)
-
-## 🔮 Future Enhancements
-
-- [ ] MicroSD card support for expanded storage
-- [ ] End-to-end encryption
-- [ ] Message read receipts
-- [ ] Voice message support
-- [ ] Group chat functionality
-- [ ] File browser (view all uploaded files)
-- [ ] Message search functionality
-- [ ] User avatars and profiles
-- [ ] Message reactions
-- [ ] Push notifications (when online)
+---
 
 ## 🤝 Contributing
 
@@ -468,40 +331,12 @@ Contributions are welcome! Please follow these steps:
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🙏 Acknowledgments
-
-- ESP32 community for excellent documentation
-- Flutter team for the amazing framework
-- All contributors and testers
-
-## 📞 Support
-
-For issues, questions, or suggestions:
-1. Check the [Troubleshooting](#-troubleshooting) section
-2. Search existing issues
-3. Create a new issue with detailed information
-
-## 📝 Changelog
-
-### Version 1.0.0+1 (Current)
-- ✅ Initial release
-- ✅ Basic messaging functionality
-- ✅ File sharing with upload progress
-- ✅ Image viewer with zoom and share
-- ✅ Cross-platform support (Android, iOS, Windows, Linux)
-- ✅ Device discovery and private messaging
-- ✅ Local message storage
-- ✅ Settings and configuration
-- ✅ Share functionality for images and files
-- ✅ Desktop platform support with manual WiFi
-- ✅ Auto WiFi connection on mobile platforms
-
 ---
 
 <div align="center">
 
 **Built with ❤️ using Flutter & ESP32**
 
-[Report Bug](https://github.com/yourusername/chatridge/issues) · [Request Feature](https://github.com/yourusername/chatridge/issues) · [Documentation](README.md)
+[Report Bug](https://github.com/meghanasingareddy/Chatridge/issues) · [Request Feature](https://github.com/meghanasingareddy/Chatridge/issues) · [GitHub Repository](https://github.com/meghanasingareddy/Chatridge)
 
 </div>
